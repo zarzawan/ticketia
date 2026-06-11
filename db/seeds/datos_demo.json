@@ -1,0 +1,178 @@
+[
+  {
+    "titulo": "Fallo intermitente en la sincronización de bases de datos",
+    "descripcion": "Hemos notado que las réplicas de nuestras bases de datos SQL están fallando periódicamente. La sincronización se detiene sin previo aviso y debemos intervenir manualmente para reanudar el proceso, lo cual consume mucho tiempo operativo. Esto está afectando directamente la disponibilidad de los servicios críticos que dependen de esta información en tiempo real. Necesitamos una revisión exhaustiva de la configuración del cluster y los logs asociados para identificar la causa raíz de estas interrupciones recurrentes.",
+    "idioma": "es",
+    "urgencia": "critico",
+    "tipo": "Bases de datos",
+    "estado": "abierta",
+    "resumen": "Sincronización inestable en bases de datos SQL.",
+    "recomendacion": "## Recomendacion inicial - Revisar logs del servidor DB-01 - Verificar configuración de latencia entre nodos",
+    "dias_antiguedad": 3
+  },
+  {
+    "titulo": "Lentitud extrema en el acceso al panel de control CMS",
+    "descripcion": "Desde hace aproximadamente dos días, el tiempo de respuesta del panel de administración de nuestro sitio web (CMS) ha aumentado drásticamente. Las operaciones simples, como la carga de páginas o la gestión de contenido, tardan varios segundos en ejecutarse. Sospechamos que puede deberse a una sobrecarga de recursos o a un cuello de botella en el servidor dedicado. Por favor, analicen los métricas de CPU y RAM para determinar si es necesario escalar o ajustar el plan de hosting.",
+    "idioma": "es",
+    "urgencia": "urgente",
+    "tipo": "Web y dominios",
+    "estado": "en_curso",
+    "resumen": "CMS extremadamente lento, alto tiempo de respuesta.",
+    "recomendacion": "## Recomendacion inicial - Monitorear uso de CPU en el servidor - Optimizar la caché del CMS",
+    "dias_antiguedad": 7
+  },
+  {
+    "titulo": "Fallo completo en el servicio de correo transaccional",
+    "descripcion": "Hemos perdido completamente la capacidad de enviar correos electrónicos transaccionales desde nuestro dominio alojado. Los clientes están informando que las notificaciones importantes no se están recibiendo. El servidor SMTP parece estar inaccesible o rechazando conexiones masivas, lo cual es crítico para nuestras operaciones diarias y comunicación con usuarios externos. Necesitamos una verificación inmediata del estado del servicio de correo y sus registros de entrega.",
+    "idioma": "es",
+    "urgencia": "critico",
+    "tipo": "Correo",
+    "estado": "abierta",
+    "resumen": "No se pueden enviar correos transaccionales desde el dominio.",
+    "recomendacion": "## Recomendacion inicial - Revisar estado del servidor SMTP - Verificar listas negras y autenticación SPF/DKIM",
+    "dias_antiguedad": 1
+  },
+  {
+    "titulo": "Detección de actividad anómala en el entorno de red",
+    "descripcion": "Nuestro sistema de monitoreo ha alertado sobre un tráfico inusual y persistente que parece provenir de múltiples IPs externas hacia nuestros servidores internos. La naturaleza del tráfico sugiere un intento potencial de escaneo o intrusión. Solicitamos una revisión urgente de las reglas del firewall perimetral y una auditoría completa de los logs de acceso para mitigar cualquier amenaza activa antes de que se produzca un compromiso.",
+    "idioma": "es",
+    "urgencia": "critico",
+    "tipo": "Seguridad",
+    "estado": "abierta",
+    "resumen": "Tráfico anómalo detectado en la red, posible ataque.",
+    "recomendacion": "## Recomendacion inicial - Bloquear IPs sospechosas en el WAF - Realizar escaneo de vulnerabilidades internos",
+    "dias_antiguedad": 2
+  },
+  {
+    "titulo": "Configuración incorrecta del balanceador de carga",
+    "descripcion": "Hemos implementado recientemente un nuevo conjunto de servidores, pero el balanceador de carga no está distribuyendo las peticiones de manera uniforme. Algunos nodos están experimentando sobrecarga mientras otros están inactivos, lo que degrada la experiencia general de los usuarios y puede llevar a fallos en picos de tráfico. Necesitamos ajustar los pesos y algoritmos de distribución para optimizar el rendimiento del clúster.",
+    "idioma": "es",
+    "urgencia": "urgente",
+    "tipo": "Red y acceso",
+    "estado": "en_curso",
+    "resumen": "El balanceador de carga no distribuye el tráfico correctamente.",
+    "recomendacion": "## Recomendacion inicial - Revisar configuraciones de health checks - Ajustar pesos en el algoritmo L4/L7",
+    "dias_antiguedad": 5
+  },
+  {
+    "titulo": "Solicitud de aumento de capacidad de almacenamiento SSD",
+    "descripcion": "Nuestro volumen actual de almacenamiento se está acercando al límite máximo y, aunque aún no hemos alcanzado la saturación, esperamos que en las próximas semanas sea un problema. Necesitamos aumentar el espacio disponible para soportar el crecimiento esperado de nuestros archivos log y bases de datos. Solicitamos una cotización e implementación del aumento de capacidad a nivel de infraestructura lo antes posible.",
+    "idioma": "es",
+    "urgencia": "leve",
+    "tipo": "Almacenamiento",
+    "estado": "abierta",
+    "resumen": "Necesidad de aumentar el espacio en disco SSD.",
+    "recomendacion": "## Recomendacion inicial - Evaluar planes de almacenamiento superior - Planificar la migración del volumen existente",
+    "dias_antiguedad": 15
+  },
+  {
+    "titulo": "Intento de acceso no autorizado a datos sensibles (Alertas)",
+    "descripcion": "El sistema de detección de intrusiones ha registrado múltiples intentos fallidos y persistentes para acceder a archivos configurados como altamente sensibles en nuestro servidor. Aunque los accesos han sido bloqueados, la frecuencia y el origen de estos intentos son preocupantes y sugieren un ataque automatizado dirigido a la extracción de información crítica. Requerimos una revisión forense de los logs de seguridad.",
+    "idioma": "es",
+    "urgencia": "critico",
+    "tipo": "Seguridad",
+    "estado": "abierta",
+    "resumen": "Múltiples intentos fallidos de acceso a datos sensibles.",
+    "recomendacion": "## Recomendacion inicial - Aislar el servidor afectado temporalmente - Implementar MFA en todos los accesos administrativos",
+    "dias_antiguedad": 28
+  },
+  {
+    "titulo": "Consulta sobre tarifas de migración a la nube (AWS/Azure)",
+    "descripcion": "Estamos evaluando una transición completa de nuestra infraestructura local hacia un entorno de nube gestionada. Nos gustaría recibir información detallada y cotizaciones para migrar nuestras aplicaciones actuales, incluyendo bases de datos y entornos de desarrollo, a su plataforma cloud. Necesitamos entender los costes operativos (OPEX) versus la inversión inicial.",
+    "idioma": "es",
+    "urgencia": "leve",
+    "tipo": "Comercial",
+    "estado": "cerrada",
+    "resumen": "Solicitud de información comercial sobre migración a nube.",
+    "recomendacion": "## Recomendacion inicial - Programar una demo técnica con un especialista - Enviar dossier de precios y SLA",
+    "dias_antiguedad": 45
+  },
+  {
+    "titulo": "Fallo en la restauración de copias de seguridad nocturnas",
+    "descripcion": "Las tareas programadas de backup han fallado consistentemente durante las últimas tres noches. El estado del servicio reporta errores al finalizar el proceso, lo que implica que no estamos teniendo una copia de seguridad fresca y viable de nuestros datos críticos. Esto representa un riesgo enorme en caso de fallo catastrófico del sistema o ataque de ransomware. Por favor, revisen los logs de backup inmediatamente.",
+    "idioma": "es",
+    "urgencia": "critico",
+    "tipo": "Backups",
+    "estado": "abierta",
+    "resumen": "Los backups nocturnos no se están completando correctamente.",
+    "recomendacion": "## Recomendacion inicial - Verificar espacio de almacenamiento del destino del backup - Revisar credenciales y permisos de acceso",
+    "dias_antiguedad": 10
+  },
+  {
+    "titulo": "Necesidad de un nuevo usuario con privilegios de administrador",
+    "descripcion": "El equipo de desarrollo requiere acceso completo a varios entornos de prueba para desplegar nuevas funcionalidades. Necesitamos crear una nueva cuenta de usuario que posea todos los permisos necesarios en el grupo 'DevOps-FullAccess'. Por favor, configuren esta cuenta y envíennos las credenciales temporales para que podamos proceder con la integración.",
+    "idioma": "es",
+    "urgencia": "leve",
+    "tipo": "Usuarios y permisos",
+    "estado": "en_curso",
+    "resumen": "Creación de nuevo usuario administrador para desarrollo.",
+    "recomendacion": "## Recomendacion inicial - Crear el nuevo perfil de usuario en el LDAP - Configurar los permisos específicos requeridos",
+    "dias_antiguedad": 30
+  },
+  {
+    "titulo": "Inconsistencia al acceder a la API de integración externa",
+    "descripcion": "Nuestra aplicación cliente está recibiendo errores HTTP 503 cuando intenta comunicarse con el endpoint de nuestra API. El servicio parece estar temporalmente indisponible o las claves de acceso han expirado, lo que impide la sincronización automatizada con sistemas externos. Necesitamos confirmar el estado del servicio y asegurar la validez de los tokens de autenticación.",
+    "idioma": "es",
+    "urgencia": "urgente",
+    "tipo": "APIs y scripts",
+    "estado": "abierta",
+    "resumen": "Errores 503 al intentar usar la API de integración.",
+    "recomendacion": "## Recomendacion inicial - Verificar el estado del servicio de API en el dashboard - Recargar los tokens de autenticación si es necesario",
+    "dias_antiguedad": 4
+  },
+  {
+    "titulo": "Disponibilidad limitada del almacenamiento SAN",
+    "descripcion": "Estamos experimentando interrupciones o latencias elevadas al intentar escribir grandes cantidades de datos en nuestro volumen compartido. La monitorización indica que el rendimiento del Storage Area Network (SAN) ha caído por debajo de los umbrales aceptables durante las últimas horas, afectando la velocidad general de nuestras aplicaciones críticas. Solicitamos una revisión profunda del sistema de almacenamiento.",
+    "idioma": "es",
+    "urgencia": "urgente",
+    "tipo": "Almacenamiento",
+    "estado": "abierta",
+    "resumen": "Latencias altas y disponibilidad reducida en SAN.",
+    "recomendacion": "## Recomendacion inicial - Revisar la carga de I/O del sistema SAN - Verificar el estado físico de los discos duros",
+    "dias_antiguedad": 6
+  },
+  {
+    "titulo": "Problemas con la conectividad VPN a red privada (Remote)",
+    "descripcion": "Los empleados remotos no pueden establecer una conexión estable ni mantenerla a través de nuestra VPN corporativa. La conexión se cae intermitentemente, lo que impide el acceso seguro a los recursos internos de la empresa. Parece ser un problema en la configuración del túnel o en el router perimetral. Necesitamos asistencia para estabilizar y asegurar la conexión remota.",
+    "idioma": "es",
+    "urgencia": "urgente",
+    "tipo": "Red y acceso",
+    "estado": "en_curso",
+    "resumen": "La VPN corporativa se desconecta intermitentemente para usuarios remotos.",
+    "recomendacion": "## Recomendacion inicial - Revisar los logs del gateway VPN - Ajustar parámetros de timeout o reintento en el cliente VPN",
+    "dias_antiguedad": 12
+  },
+  {
+    "titulo": "Cloud service quota exceeded on S3 bucket",
+    "descripcion": "We have noticed that our designated S3 storage bucket is exceeding its allocated limits for data transfer and object count. This has resulted in multiple API calls failing with 'Quota Exceeded' errors, which stops our automated ingestion pipeline from functioning correctly. We need an immediate adjustment to the service quota or a scaling plan for this cloud resource.",
+    "idioma": "en",
+    "urgencia": "critico",
+    "tipo": "Cloud",
+    "estado": "abierta",
+    "resumen": "S3 bucket excedió su cuota de transferencia y objetos.",
+    "recomendacion": "## Recomendacion inicial - Aumentar el límite de la cuota del servicio en AWS - Revisar si hay datos redundantes o ineficientes",
+    "dias_antiguedad": 1
+  },
+  {
+    "titulo": "Problème d'accès aux sauvegardes critiques (Sauvegarde)",
+    "descripcion": "Nous n'arrivons plus à récupérer nos données de sauvegarde essentielles. Le système signale une erreur de permissions lors de la tentative de restauration depuis le stockage distant. Cette situation est inacceptable car elle compromet notre capacité de reprise après sinistre. Veuillez vérifier les droits d'accès au volume de sauvegarde et nous aider à rétablir l'intégrité des fichiers.",
+    "idioma": "fr",
+    "urgencia": "critico",
+    "tipo": "Backups",
+    "estado": "abierta",
+    "resumen": "No se puede restaurar ninguna copia de seguridad crítica.",
+    "recomendacion": "## Recomendacion inicial - Verificar los permisos IAM del bucket de backup - Realizar una prueba de restauración menor (test restore)",
+    "dias_antiguedad": 18
+  },
+  {
+    "titulo": "Pèrdua de accés a la plataforma CRM",
+    "descripcion": "Un grup d'administració ha perdut l'accés a la nostra plataforma ERP/CRM. El sistema exige credencials que ara són invalides, i els attempts de resetejar les contrasenyes estan fallant amb un error indefinit. Necessitem una intervenció ràpida per restaurar el trànsit d'administració i garantir que el negoci no s'atura.",
+    "idioma": "ca",
+    "urgencia": "urgent",
+    "tipo": "ERP / CRM",
+    "estado": "abierta",
+    "resumen": "Pèrdua de accés a la plataforma CRM, credencials fallides.",
+    "recomendacion": "## Recomendacion inicial - Revisar los registros del servidor de autenticación - Forzar un restablecimiento manual de las contraseñas",
+    "dias_antiguedad": 50
+  }
+]
