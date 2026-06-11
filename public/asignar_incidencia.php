@@ -13,8 +13,9 @@ $isAjax = (isset($_POST['ajax']) && $_POST['ajax'] === '1') ||
 $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
 $asignado = trim((string)($_POST['asignado'] ?? ''));
 
-// '' = quitar asignacion. Cualquier otro valor debe estar en la lista de tecnicos.
-if (!$id_incidencia || ($asignado !== '' && !in_array($asignado, dominio_tecnicos(), true))) {
+// '' = quitar asignacion. Cualquier otro valor debe ser un usuario asignable.
+$asignables_ids = array_map(fn($u) => (string)$u['id'], usuarios_asignables($pdo));
+if (!$id_incidencia || ($asignado !== '' && !in_array($asignado, $asignables_ids, true))) {
     if ($isAjax) {
         http_response_code(400);
         header('Content-Type: application/json');
@@ -26,12 +27,13 @@ if (!$id_incidencia || ($asignado !== '' && !in_array($asignado, dominio_tecnico
     exit;
 }
 
-$sql = "UPDATE incidencias SET asignado_a = :asignado WHERE id = :id";
+$sql = "UPDATE incidencias SET asignado_id = :asignado WHERE id = :id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([
-    ':asignado' => $asignado === '' ? null : $asignado,
+    ':asignado' => $asignado === '' ? null : (int)$asignado,
     ':id' => $id_incidencia
 ]);
+auditar($pdo, 'asignar', "incidencia #$id_incidencia -> " . ($asignado === '' ? 'sin asignar' : "usuario #$asignado"));
 
 if ($isAjax) {
     header('Content-Type: application/json');

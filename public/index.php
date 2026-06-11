@@ -50,8 +50,15 @@ $filtro_estado = isset($_GET['filtro_estado']) && in_array($_GET['filtro_estado'
 $filtro_desde = isset($_GET['filtro_desde']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_desde']) ? $_GET['filtro_desde'] : '';
 $filtro_hasta = isset($_GET['filtro_hasta']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_hasta']) ? $_GET['filtro_hasta'] : '';
 $orden = isset($_GET['orden']) && in_array($_GET['orden'], $ordenes, true) ? $_GET['orden'] : 'id_desc';
-$asignados_validos = array_merge(['sin_asignar'], dominio_tecnicos());
-$filtro_asignado = isset($_GET['filtro_asignado']) && in_array($_GET['filtro_asignado'], $asignados_validos, true) ? $_GET['filtro_asignado'] : '';
+$asignables = usuarios_asignables($pdo);
+$asignables_ids = array_map(fn($u) => (string)$u['id'], $asignables);
+$filtro_asignado = '';
+if (isset($_GET['filtro_asignado'])) {
+    $candidato_asignado = (string)$_GET['filtro_asignado'];
+    if ($candidato_asignado === 'sin_asignar' || in_array($candidato_asignado, $asignables_ids, true)) {
+        $filtro_asignado = $candidato_asignado;
+    }
+}
 $limite = isset($_GET['limite']) ? (int)$_GET['limite'] : 50;
 if (!in_array($limite, $limites_validos, true)) {
     $limite = 50;
@@ -165,7 +172,7 @@ $sql_kpi = "
         SUM(urgencia = 'critico') AS criticas,
         SUM(urgencia = 'critico' AND estado <> 'cerrada') AS criticas_abiertas,
         SUM(estado <> 'cerrada' AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
-        SUM(asignado_a IS NULL AND estado <> 'cerrada') AS sin_asignar,
+        SUM(asignado_id IS NULL AND estado <> 'cerrada') AS sin_asignar,
         SUM(tipo = 'Comercial') AS comerciales,
         AVG(CASE WHEN fecha_cierre IS NOT NULL THEN TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_cierre) END) AS ttr_horas,
         AVG(CASE WHEN estado <> 'cerrada' THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
@@ -235,7 +242,8 @@ $estados_kanban = $filtro_estado ? [$filtro_estado] : $estados;
 $kanban_limit = $limite === 0 ? 200 : min($limite, 100);
 
 foreach ($estados_kanban as $estado_kanban) {
-    $sql_kanban = "SELECT id, titulo, resumen, tipo, urgencia, estado, fecha_creacion, asignado_a
+    $sql_kanban = "SELECT id, titulo, resumen, tipo, urgencia, estado, fecha_creacion, asignado_id,
+                          (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre
                    FROM incidencias WHERE estado = :estado";
     $params_kanban = [':estado' => $estado_kanban];
 
@@ -312,7 +320,7 @@ if ($limite === 20) {
             <h1>TicketIA</h1>
             <p class="subtitulo">Gestion, analisis y seguimiento en una sola vista.</p>
         </div>
-        <button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button>
+        <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
     </header>
 
     <?php if ($mensaje_exito): ?>
@@ -348,9 +356,9 @@ if ($limite === 20) {
                     <select id="filtro_asignado" name="filtro_asignado">
                         <option value="">Todos</option>
                         <option value="sin_asignar" <?= $filtro_asignado === 'sin_asignar' ? 'selected' : '' ?>>Sin asignar</option>
-                        <?php foreach (dominio_tecnicos() as $tecnico): ?>
-                            <option value="<?= ui_e($tecnico) ?>" <?= $filtro_asignado === $tecnico ? 'selected' : '' ?>>
-                                <?= ui_e($tecnico) ?>
+                        <?php foreach ($asignables as $asignable): ?>
+                            <option value="<?= (int)$asignable['id'] ?>" <?= $filtro_asignado === (string)$asignable['id'] ? 'selected' : '' ?>>
+                                <?= ui_e($asignable['nombre']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -479,6 +487,7 @@ if ($limite === 20) {
                         <a href="analisis_seguridad.php" class="card-button secondary-button">Seguridad</a>
                     </div>
                     <form action="cambiar_proveedor.php" method="POST" class="ia-provider-form">
+                        <?= csrf_campo() ?>
                         <label class="filter-label" for="selector_proveedor">Proveedor</label>
                         <select name="proveedor" id="selector_proveedor" onchange="this.form.submit()">
                             <?php foreach ($llm_config as $clave_proveedor => $conf_proveedor): ?>
@@ -537,7 +546,7 @@ if ($limite === 20) {
                     </header>
                     <div class="<?= ui_e($dropzone_class) ?>">
                         <?php foreach ($kanban_data[$estado_columna] as $incidencia_k): ?>
-                            <?= ui_render_kanban_card($incidencia_k) ?>
+                            <?= ui_render_kanban_card($incidencia_k, $asignables) ?>
                         <?php endforeach; ?>
                         <?php if ($total_en_columna < $total_estado_bd && $siguiente_limite !== null): ?>
                             <a class="card-button kanban-ver-mas" href="<?= ui_e(buildQueryUrl(['limite' => (string)$siguiente_limite])) ?>">
@@ -554,6 +563,7 @@ if ($limite === 20) {
         <h2>Abrir nueva incidencia</h2>
         <p class="help-line" style="margin-top:-6px; margin-bottom:14px;">La IA clasificara urgencia, departamento e idioma automaticamente al crearla.</p>
         <form action="guardar_incidencia.php" method="POST" accept-charset="UTF-8" id="formNuevaIncidencia" class="form-stack alta-form">
+            <?= csrf_campo() ?>
             <div class="filter-field">
                 <label class="filter-label" for="titulo">Titulo</label>
                 <input type="text" id="titulo" name="titulo" required autocomplete="off" placeholder="Resume el problema en una linea">
@@ -576,6 +586,8 @@ if ($limite === 20) {
 </div>
 
 <script>
+const CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;
+
 function limpiarFiltros() {
     localStorage.removeItem('incidencias_filtros');
     window.location.href = 'index.php';
@@ -811,7 +823,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const payload = new URLSearchParams({
                     id_incidencia: incidenciaId,
-                    estado: targetState
+                    estado: targetState,
+                    csrf: CSRF_TOKEN
                 });
 
                 const response = await fetch('mover_incidencia_estado.php', {
@@ -850,7 +863,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const payload = new URLSearchParams({
                     id_incidencia: incidenciaId,
-                    estado: targetState
+                    estado: targetState,
+                    csrf: CSRF_TOKEN
                 });
 
                 const response = await fetch('mover_incidencia_estado.php', {
@@ -905,7 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = new URLSearchParams({
                     id_incidencia: incidenciaId,
                     asignado: select.value,
-                    ajax: '1'
+                    ajax: '1',
+                    csrf: CSRF_TOKEN
                 });
 
                 const response = await fetch('asignar_incidencia.php', {
@@ -1006,7 +1021,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = new URLSearchParams({
                     id_incidencia: incidenciaId,
                     tipo,
-                    ajax: '1'
+                    ajax: '1',
+                    csrf: CSRF_TOKEN
                 });
 
                 const response = await fetch('actualizar_tipo_incidencia.php', {

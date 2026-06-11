@@ -62,12 +62,6 @@ function dominio_tipos_para_prompt(): string {
     return "'" . implode("', '", dominio_tipos()) . "'";
 }
 
-// Lista de tecnicos asignables. Editar aqui para anadir o quitar personas
-// (cuando exista gestion de usuarios, esta lista pasara a la base de datos).
-function dominio_tecnicos(): array {
-    return ['Jose Luis', 'Tecnico 2', 'Tecnico 3'];
-}
-
 function dominio_urgencias(): array {
     return ['critico', 'urgente', 'leve'];
 }
@@ -113,10 +107,10 @@ function dominio_append_filtros(string &$sql, array &$params, array $f, string $
 
     if (!empty($f['asignado'])) {
         if ($f['asignado'] === 'sin_asignar') {
-            $sql .= " AND ({$prefix}asignado_a IS NULL OR {$prefix}asignado_a = '')";
+            $sql .= " AND {$prefix}asignado_id IS NULL";
         } else {
-            $sql .= " AND {$prefix}asignado_a = :asignado";
-            $params[':asignado'] = $f['asignado'];
+            $sql .= " AND {$prefix}asignado_id = :asignado";
+            $params[':asignado'] = (int)$f['asignado'];
         }
     }
 

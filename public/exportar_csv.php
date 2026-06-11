@@ -13,10 +13,16 @@ $filtro_estado = isset($_GET['filtro_estado']) && in_array($_GET['filtro_estado'
 $filtro_desde = isset($_GET['filtro_desde']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_desde']) ? $_GET['filtro_desde'] : '';
 $filtro_hasta = isset($_GET['filtro_hasta']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_hasta']) ? $_GET['filtro_hasta'] : '';
 $orden = isset($_GET['orden']) && in_array($_GET['orden'], $ordenes, true) ? $_GET['orden'] : 'id_desc';
-$asignados_validos = array_merge(['sin_asignar'], dominio_tecnicos());
-$filtro_asignado = isset($_GET['filtro_asignado']) && in_array($_GET['filtro_asignado'], $asignados_validos, true) ? $_GET['filtro_asignado'] : '';
+$asignables_ids = array_map(fn($u) => (string)$u['id'], usuarios_asignables($pdo));
+$filtro_asignado = '';
+if (isset($_GET['filtro_asignado'])) {
+    $candidato_asignado = (string)$_GET['filtro_asignado'];
+    if ($candidato_asignado === 'sin_asignar' || in_array($candidato_asignado, $asignables_ids, true)) {
+        $filtro_asignado = $candidato_asignado;
+    }
+}
 
-$sql = "SELECT id, titulo, descripcion, resumen, tipo, urgencia, estado, idioma, asignado_a, fecha_creacion, fecha_cierre FROM incidencias WHERE 1=1";
+$sql = "SELECT id, titulo, descripcion, resumen, tipo, urgencia, estado, idioma, (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre, fecha_creacion, fecha_cierre FROM incidencias WHERE 1=1";
 $params = [];
 dominio_append_filtros($sql, $params, [
     'busqueda' => $busqueda,
@@ -63,7 +69,7 @@ foreach ($rows as $row) {
         $row['urgencia'] ?? '',
         $row['estado'] ?? '',
         $row['idioma'] ?? '',
-        $row['asignado_a'] ?? '',
+        $row['asignado_nombre'] ?? '',
         $row['fecha_creacion'] ?? '',
         $row['fecha_cierre'] ?? ''
     ], ';');

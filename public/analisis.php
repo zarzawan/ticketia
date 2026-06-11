@@ -470,7 +470,7 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
                 <h1>Analisis de incidencias</h1>
                 <p class="subtitulo">Resumen ejecutivo y priorizacion generado por IA.</p>
             </div>
-            <button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button>
+            <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
         </header>
 
         <div class="page-tools">

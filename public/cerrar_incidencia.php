@@ -16,6 +16,7 @@ if (!$id_incidencia) {
 $sql = "UPDATE incidencias SET estado = 'cerrada', fecha_cierre = NOW() WHERE id = :id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([':id' => $id_incidencia]);
+auditar($pdo, 'cerrar_incidencia', "incidencia #$id_incidencia");
 
 // Redirigir de nuevo
 header("Location: ver_incidencia.php?id=" . $id_incidencia);

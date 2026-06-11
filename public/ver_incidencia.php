@@ -7,7 +7,7 @@ if ($id === false || $id === null) {
     exit;
 }
 
-$sql_incidencia = "SELECT * FROM incidencias WHERE id = :id";
+$sql_incidencia = "SELECT incidencias.*, (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre FROM incidencias WHERE id = :id";
 $stmt_incidencia = $pdo->prepare($sql_incidencia);
 $stmt_incidencia->execute([':id' => $id]);
 $incidencia = $stmt_incidencia->fetch(PDO::FETCH_ASSOC);
@@ -16,6 +16,8 @@ if (!$incidencia) {
     header('Location: index.php');
     exit;
 }
+
+$asignables = usuarios_asignables($pdo);
 
 $sql_mensajes = "SELECT autor, mensaje, fecha FROM mensajes WHERE id_incidencia = :id ORDER BY fecha ASC";
 $stmt_mensajes = $pdo->prepare($sql_mensajes);
@@ -172,7 +174,7 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                     <span>· <?= (int)$dias_abierta ?> dias</span>
                 </p>
             </div>
-            <button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button>
+            <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
         </header>
 
         <?php if (isset($_GET['reclasificada'])): ?>
@@ -187,7 +189,7 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
             <a href="index.php" class="card-button secondary-button" title="Volver al panel principal">‹ Volver</a>
             <a href="consultar_llm.php?id=<?= $id_incidencia ?>" class="card-button" title="Resumir incidencia con IA">Resumir con IA</a>
             <form action="reclasificar_incidencia.php" method="POST" style="display:inline;" onsubmit="return confirm('La IA recalculara urgencia, tipo, idioma, resumen y recomendacion. Continuar?');">
-                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                 <button type="submit" class="card-button" title="Recalcular clasificacion IA">Re-clasificar con IA</button>
             </form>
             <button type="button" class="card-button secondary-button" id="copyTicketId">Copiar ID</button>
@@ -220,7 +222,7 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                         <h2>Recomendacion de venta</h2>
                         <div class="page-tools">
                             <form action="recomendar_venta.php" method="POST">
-                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                                 <input type="submit" value="Obtener recomendacion">
                             </form>
                             <a href="ver_catalogo.php" target="_blank" class="card-button secondary-button">Ver catalogo</a>
@@ -265,7 +267,7 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
 
                 <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
                     <form action="guardar_mensaje.php" method="POST" class="composer">
-                        <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                        <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                         <input type="hidden" name="idioma_original" value="<?= ui_e((string)($incidencia['idioma'] ?? 'es')) ?>">
                         <textarea name="mensaje" id="mensaje" rows="4" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
                         <div class="composer-row">
@@ -318,7 +320,7 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                         <div class="detail-row">
                             <span>Departamento</span>
                             <form action="actualizar_tipo_incidencia.php" method="POST" class="detail-row-form">
-                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                                 <select name="tipo" onchange="this.form.submit()" title="Se guarda automaticamente">
                                     <option value="" disabled <?= empty($incidencia['tipo']) ? 'selected' : '' ?>>Sin clasificar</option>
                                     <?php foreach (dominio_tipos() as $tipo): ?>
@@ -332,12 +334,12 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                         <div class="detail-row">
                             <span>Asignado</span>
                             <form action="asignar_incidencia.php" method="POST" class="detail-row-form">
-                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                                 <select name="asignado" onchange="this.form.submit()" title="Se guarda automaticamente">
-                                    <option value="" <?= empty($incidencia['asignado_a']) ? 'selected' : '' ?>>Sin asignar</option>
-                                    <?php foreach (dominio_tecnicos() as $tecnico): ?>
-                                        <option value="<?= ui_e($tecnico) ?>" <?= ($incidencia['asignado_a'] ?? '') === $tecnico ? 'selected' : '' ?>>
-                                            <?= ui_e($tecnico) ?>
+                                    <option value="" <?= empty($incidencia['asignado_id']) ? 'selected' : '' ?>>Sin asignar</option>
+                                    <?php foreach ($asignables as $asignable): ?>
+                                        <option value="<?= (int)$asignable['id'] ?>" <?= (int)($incidencia['asignado_id'] ?? 0) === (int)$asignable['id'] ? 'selected' : '' ?>>
+                                            <?= ui_e($asignable['nombre']) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -347,12 +349,12 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
 
                     <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
                         <form action="cerrar_incidencia.php" method="POST" class="detail-action" onsubmit="return confirm('Se cerrara la incidencia. Continuar?');">
-                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                             <button type="submit" class="card-button danger-button">Cerrar incidencia</button>
                         </form>
                     <?php else: ?>
                         <form action="reabrir_incidencia.php" method="POST" class="detail-action form-stack" onsubmit="return confirm('Se reabrira la incidencia. Continuar?');">
-                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>">
+                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                             <label class="filter-label" for="motivo">Motivo de la reapertura</label>
                             <textarea name="motivo" id="motivo" rows="3" required></textarea>
                             <input type="submit" value="Reabrir incidencia">

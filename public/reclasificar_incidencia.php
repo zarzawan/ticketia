@@ -28,5 +28,6 @@ if ($clasificacion === null) {
 }
 
 clasificacion_aplicar($pdo, $id_incidencia, $clasificacion);
+auditar($pdo, 'reclasificar_ia', "incidencia #$id_incidencia");
 header("Location: ver_incidencia.php?id=$id_incidencia&reclasificada=1");
 exit;

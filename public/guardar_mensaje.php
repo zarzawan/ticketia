@@ -38,6 +38,7 @@ $stmt->execute([
     ':autor' => $autor,
     ':mensaje' => $mensaje_final
 ]);
+auditar($pdo, 'nuevo_mensaje', "incidencia #$id_incidencia ($autor)");
 
 header("Location: ver_incidencia.php?id=$id_incidencia&ok=1");
 exit;

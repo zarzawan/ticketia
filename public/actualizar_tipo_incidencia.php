@@ -28,6 +28,7 @@ if (!$id_incidencia || !$tipo || !in_array($tipo, dominio_tipos(), true)) {
 $sql = "UPDATE incidencias SET tipo = :tipo WHERE id = :id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([':tipo' => $tipo, ':id' => $id_incidencia]);
+auditar($pdo, 'cambiar_tipo', "incidencia #$id_incidencia -> $tipo");
 
 if ($isAjax) {
     header('Content-Type: application/json');

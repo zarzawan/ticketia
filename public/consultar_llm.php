@@ -172,7 +172,7 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
                 <h1>Resumen IA - Incidencia #<?php echo $id_incidencia; ?></h1>
                 <p class="subtitulo">Resumen generado por IA para la incidencia seleccionada.</p>
             </div>
-            <button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button>
+            <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
         </header>
 
         <div class="page-tools">

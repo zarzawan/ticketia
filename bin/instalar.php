@@ -94,8 +94,47 @@ if ($conDemo) {
     }
 }
 
+// 6. Administrador inicial (solo si no existe ningun usuario).
+//    Opciones: --admin-email=correo --admin-pass=contrasena
+$bd = new PDO("mysql:host=$host;port=$port;dbname=$nombreSeguro;charset=utf8mb4", $user, $pass, [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+]);
+
+$totalUsuarios = (int)$bd->query("SELECT COUNT(*) FROM usuarios")->fetchColumn();
+if ($totalUsuarios === 0) {
+    $adminEmail = 'admin@ticketia.local';
+    $adminPass = null;
+    foreach ($argv as $arg) {
+        if (str_starts_with($arg, '--admin-email=')) {
+            $adminEmail = substr($arg, 14);
+        }
+        if (str_starts_with($arg, '--admin-pass=')) {
+            $adminPass = substr($arg, 13);
+        }
+    }
+
+    $generada = false;
+    if ($adminPass === null || strlen($adminPass) < 10) {
+        $adminPass = rtrim(strtr(base64_encode(random_bytes(12)), '+/', 'Aa'), '=');
+        $generada = true;
+    }
+
+    $algoritmo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
+    $bd->prepare("INSERT INTO usuarios (nombre, email, hash_password, rol) VALUES ('Administrador', :e, :h, 'admin')")
+        ->execute([':e' => $adminEmail, ':h' => password_hash($adminPass, $algoritmo)]);
+
+    echo "\n-- Administrador inicial --\n";
+    echo "Email:      $adminEmail\n";
+    if ($generada) {
+        echo "Contrasena: $adminPass\n";
+        echo "(generada automaticamente: apuntala y cambiala tras el primer acceso)\n";
+    } else {
+        echo "Contrasena: la indicada en --admin-pass\n";
+    }
+}
+
 echo "\n== Instalacion completada ==\n";
-echo "Apunta tu servidor web al directorio public/ y abre index.php\n";
+echo "Apunta tu servidor web al directorio public/ y abre login.php\n";
 if (!$conDemo) {
     echo "(Puedes cargar datos de ejemplo con: php bin/instalar.php --con-demo)\n";
 }

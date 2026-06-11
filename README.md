@@ -4,8 +4,8 @@
 
 *Open source AI-powered helpdesk — self-hosted, multilingual, works with fully local AI.*
 
-> ⚠️ **Estado: en desarrollo activo (pre-v1.0).** La autenticación y los roles llegan en la
-> siguiente fase: todavía **no** debe exponerse a internet.
+> ⚠️ **Estado: en desarrollo activo (pre-v1.0).** Incluye autenticación con roles, CSRF y
+> auditoría, pero aún no ha pasado una revisión de seguridad externa.
 
 ---
 
@@ -49,7 +49,11 @@ docker compose exec php composer install
 docker compose exec php php bin/instalar.php --con-demo
 ```
 
-Abre **http://localhost:8080** — tendrás el panel con datos de demostración.
+Abre **http://localhost:8080** — el instalador habrá creado el usuario administrador
+(`admin@ticketia.local` con contraseña generada, mostrada por consola; o pasa
+`--admin-email=... --admin-pass=...` para elegirla) y tendrás el panel con datos de
+demostración. Desde **Usuarios** puedes crear el resto de cuentas (admin, operador,
+comercial, cliente).
 
 > Para usar tu IA local desde Docker, en `.env` usa
 > `LLM_LOCAL_ENDPOINT=http://host.docker.internal:1234/v1/chat/completions`.
@@ -84,7 +88,7 @@ con valores por defecto y puedes clasificarlos a mano o re-clasificarlos con IA 
 
 - [x] Núcleo de tickets + IA (POC endurecida)
 - [x] Instalador, migraciones, Docker, datos de demo
-- [ ] Autenticación, roles y auditoría (en curso)
+- [x] Autenticación, roles, CSRF y auditoría (2FA y recuperación por email, pendientes)
 - [ ] Multicliente y adjuntos
 - [ ] Portal de cliente con notificaciones email
 - [ ] Panel de administración

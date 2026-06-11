@@ -20,6 +20,7 @@ $stmt = $pdo->prepare(
      ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
 );
 $stmt->execute([':valor' => $proveedor]);
+auditar($pdo, 'cambiar_proveedor_ia', $proveedor);
 
 header('Location: index.php?proveedor_ok=1');
 exit;

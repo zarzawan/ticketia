@@ -49,7 +49,7 @@ function ui_iniciales(string $nombre): string {
     return mb_strtoupper($iniciales);
 }
 
-function ui_render_kanban_card(array $incidencia): string {
+function ui_render_kanban_card(array $incidencia, array $asignables = []): string {
     $id = (int)($incidencia['id'] ?? 0);
     $titulo = ui_e($incidencia['titulo'] ?? 'Sin titulo');
     $resumen = ui_e($incidencia['resumen'] ?? 'Sin resumen');
@@ -58,7 +58,8 @@ function ui_render_kanban_card(array $incidencia): string {
     $estado = (string)($incidencia['estado'] ?? 'abierta');
     $tipoRaw = (string)($incidencia['tipo'] ?? '');
     $tipo = ui_e($tipoRaw !== '' ? $tipoRaw : 'Sin tipo');
-    $asignadoRaw = (string)($incidencia['asignado_a'] ?? '');
+    $asignadoId = (int)($incidencia['asignado_id'] ?? 0);
+    $asignadoNombre = (string)($incidencia['asignado_nombre'] ?? '');
     $fechaCreacionRaw = (string)($incidencia['fecha_creacion'] ?? '');
     $edadTexto = '';
     $edadDias = 0;
@@ -81,17 +82,18 @@ function ui_render_kanban_card(array $incidencia): string {
         $options .= "<option value='{$safeTipo}'{$selected}>{$safeTipo}</option>";
     }
 
-    $opcionesAsignado = "<option value=''" . ($asignadoRaw === '' ? ' selected' : '') . ">Sin asignar</option>";
-    foreach (dominio_tecnicos() as $tecnico) {
-        $selected = $asignadoRaw === $tecnico ? ' selected' : '';
-        $safeTecnico = ui_e($tecnico);
-        $opcionesAsignado .= "<option value='{$safeTecnico}'{$selected}>{$safeTecnico}</option>";
+    $opcionesAsignado = "<option value=''" . ($asignadoId === 0 ? ' selected' : '') . ">Sin asignar</option>";
+    foreach ($asignables as $asignable) {
+        $idAsignable = (int)$asignable['id'];
+        $selected = $asignadoId === $idAsignable ? ' selected' : '';
+        $safeNombre = ui_e((string)$asignable['nombre']);
+        $opcionesAsignado .= "<option value='{$idAsignable}'{$selected}>{$safeNombre}</option>";
     }
 
-    $avatarVacio = $asignadoRaw === '';
+    $avatarVacio = $asignadoId === 0 || $asignadoNombre === '';
     $avatarClase = $avatarVacio ? 'kanban-avatar is-empty' : 'kanban-avatar';
-    $avatarTexto = $avatarVacio ? '–' : ui_e(ui_iniciales($asignadoRaw));
-    $avatarTitle = $avatarVacio ? 'Sin asignar' : ui_e($asignadoRaw);
+    $avatarTexto = $avatarVacio ? '–' : ui_e(ui_iniciales($asignadoNombre));
+    $avatarTitle = $avatarVacio ? 'Sin asignar' : ui_e($asignadoNombre);
 
     return "
         <article class='kanban-card {$urgencia}' draggable='true' data-id='{$id}'>
@@ -121,6 +123,28 @@ function ui_render_kanban_card(array $incidencia): string {
                 </form>
             </div>
         </article>
+    ";
+}
+
+/** Chip con el usuario autenticado y enlace de salida, para las cabeceras. */
+function ui_menu_usuario(): string {
+    $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
+    if ($usuario === null) {
+        return '';
+    }
+
+    $iniciales = ui_e(ui_iniciales((string)$usuario['nombre']));
+    $nombre = ui_e((string)$usuario['nombre']);
+    $rol = ui_e(ucfirst((string)$usuario['rol']));
+    $admin = auth_es('admin') ? "<a href='usuarios.php' title='Gestion de usuarios'>Usuarios</a>" : '';
+
+    return "
+        <span class='usuario-chip' title='{$nombre}'>
+            <span class='kanban-avatar'>{$iniciales}</span>
+            <span>{$nombre} <span class='usuario-rol'>· {$rol}</span></span>
+            {$admin}
+            <a href='logout.php' title='Cerrar sesion'>Salir</a>
+        </span>
     ";
 }
 

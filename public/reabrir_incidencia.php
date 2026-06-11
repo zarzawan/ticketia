@@ -26,6 +26,7 @@ $stmt->execute([
 $sql2 = "UPDATE incidencias SET estado = 'en_curso', fecha_cierre = NULL WHERE id = :id";
 $stmt2 = $pdo->prepare($sql2);
 $stmt2->execute([':id' => $id_incidencia]);
+auditar($pdo, 'reabrir_incidencia', "incidencia #$id_incidencia");
 
 header("Location: ver_incidencia.php?id=" . $id_incidencia);
 exit;

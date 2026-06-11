@@ -40,7 +40,7 @@ $ultimas = $pdo->query(
                 <h1>Actividad IA</h1>
                 <p class="subtitulo">Latencia, errores y volumen de llamadas a los proveedores LLM.</p>
             </div>
-            <button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button>
+            <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
         </header>
 
         <div class="page-tools">

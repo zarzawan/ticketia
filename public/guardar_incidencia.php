@@ -28,6 +28,7 @@ $stmt->execute([
 ]);
 
 $id_incidencia = (int)$pdo->lastInsertId();
+auditar($pdo, 'crear_incidencia', "incidencia #$id_incidencia: $titulo");
 
 // --- Fase 2: responder ya al usuario y clasificar en segundo plano ---
 ignore_user_abort(true);
