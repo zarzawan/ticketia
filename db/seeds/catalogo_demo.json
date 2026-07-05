@@ -1,0 +1,922 @@
+[
+    {
+        "nombre": "Cloud Storage 50 GB",
+        "descripcion": "Espacio de almacenamiento en la nube diseñado para pequeñas empresas que necesitan guardar documentos, backups o datos básicos de manera segura. Ideal para startups o equipos pequeños que buscan una solución simple para almacenar archivos sin preocupaciones de seguridad. Incluye herramientas básicas de gestión de accesos.",
+        "categoria": "almacenamiento",
+        "precio": 29.99,
+        "caracteristicas": "50 GB de almacenamiento, cifrado AES-256, acceso multiusuario, backups automáticos.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Cloud Storage 500 GB",
+        "descripcion": "Solución de almacenamiento en la nube para empresas medianas que manejan proyectos con mayor volumen de datos, como bases de datos pequeñas, aplicaciones o documentos compartidos. Perfecto para equipos que necesitan colaboración en tiempo real y seguridad avanzada. Incluye soporte técnico para configuración inicial.",
+        "categoria": "almacenamiento",
+        "precio": 99.99,
+        "caracteristicas": "500 GB de almacenamiento, cifrado AES-256, soporte 24/7, SLA 99.9%, integración con Microsoft 365.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Cloud Storage 2 TB",
+        "descripcion": "Almacenamiento en la nube de alta capacidad para grandes empresas con proyectos intensivos en datos, como big data, aplicaciones críticas o almacenamiento de medios. Ideal para organizaciones que requieren escalabilidad y rendimiento robusto. Ofrece herramientas avanzadas de gestión y auditoría.",
+        "categoria": "almacenamiento",
+        "precio": 199.99,
+        "caracteristicas": "2 TB de almacenamiento, cifrado AES-256, soporte 24/7 prioritario, SLA 99.99%, auditorías de acceso.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Cloud Storage for Backups",
+        "descripcion": "Solución de almacenamiento en la nube optimizada para backups automáticos de sistemas empresariales. Diseñada para empresas que necesitan proteger datos críticos con redundancia y recuperación rápida. Incluye opciones de programación de backups y restauración en caso de desastres.",
+        "categoria": "almacenamiento",
+        "precio": 149.99,
+        "caracteristicas": "1 TB de almacenamiento, backups automáticos, recuperación rápida, cifrado AES-256, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Cloud Storage for Collaboration",
+        "descripcion": "Espacio de almacenamiento en la nube enfocado en la colaboración en tiempo real para equipos distribuidos. Ideal para empresas que trabajan con documentos compartidos, proyectos conjuntos y flujos de trabajo colaborativos. Se integra con herramientas como Microsoft Teams y SharePoint.",
+        "categoria": "almacenamiento",
+        "precio": 179.99,
+        "caracteristicas": "1.5 TB de almacenamiento, colaboración en tiempo real, integración con Microsoft 365, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Compute Instance Basic",
+        "descripcion": "Recursos de computación en la nube para pequeñas aplicaciones o entornos de prueba. Perfecto para startups o empresas que están comenzando a desarrollar aplicaciones web o realizar pruebas de software. Ofrece un entorno simple y económico para iniciar proyectos tecnológicos.",
+        "categoria": "computacion",
+        "precio": 49.99,
+        "caracteristicas": "1 vCPU, 2 GB RAM, 50 GB SSD, ancho de banda 500 GB, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Compute Instance Standard",
+        "descripcion": "Recursos de computación en la nube para aplicaciones empresariales medianas, como sitios web corporativos o sistemas internos. Ideal para empresas que necesitan un equilibrio entre rendimiento y coste para aplicaciones de uso diario. Incluye herramientas de monitoreo básico.",
+        "categoria": "computacion",
+        "precio": 129.99,
+        "caracteristicas": "4 vCPUs, 16 GB RAM, 500 GB SSD, ancho de banda 5 TB, SLA 99.9%, monitoreo básico.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Compute Instance Advanced",
+        "descripcion": "Recursos de computación en la nube para aplicaciones críticas de alto rendimiento, como plataformas de datos, aplicaciones globales o sistemas de procesamiento intensivo. Diseñado para grandes empresas que necesitan potencia y escalabilidad. Incluye soporte prioritario y herramientas avanzadas.",
+        "categoria": "computacion",
+        "precio": 299.99,
+        "caracteristicas": "8 vCPUs, 32 GB RAM, 1 TB SSD, ancho de banda ilimitado, SLA 99.99%, soporte 24/7 prioritario.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Compute Instance for AI",
+        "descripcion": "Recursos de computación optimizados para aplicaciones de inteligencia artificial y aprendizaje automático. Ideal para empresas que desarrollan modelos de IA, análisis de datos o procesamiento de grandes volúmenes de información. Incluye acceso a GPUs para acelerar el entrenamiento de modelos.",
+        "categoria": "computacion",
+        "precio": 399.99,
+        "caracteristicas": "12 vCPUs, 64 GB RAM, 2 TB SSD, GPUs NVIDIA, ancho de banda ilimitado, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Compute Instance for High Availability",
+        "descripcion": "Recursos de computación diseñados para aplicaciones que requieren alta disponibilidad y redundancia. Perfecto para sistemas críticos que no pueden permitirse tiempos de inactividad, como plataformas de comercio electrónico o servicios financieros. Ofrece configuraciones de redundancia geográfica.",
+        "categoria": "computacion",
+        "precio": 349.99,
+        "caracteristicas": "8 vCPUs, 32 GB RAM, 1 TB SSD, redundancia geográfica, SLA 99.999%, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Basic Firewall Protection",
+        "descripcion": "Protección básica contra amenazas comunes para pequeñas empresas que necesitan un firewall simple para proteger sus redes. Ideal para startups o empresas con entornos de TI simples. Incluye monitoreo básico de intrusos y actualizaciones automáticas para mantener la seguridad.",
+        "categoria": "seguridad",
+        "precio": 39.99,
+        "caracteristicas": "Firewall básico, monitoreo de intrusos, actualizaciones automáticas, soporte por correo.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Advanced Security Suite",
+        "descripcion": "Solución de seguridad avanzada para empresas medianas que enfrentan amenazas más sofisticadas. Ofrece protección contra ciberataques como DDoS, monitoreo continuo y análisis de tráfico. Ideal para empresas que necesitan proteger datos sensibles y cumplir con regulaciones.",
+        "categoria": "seguridad",
+        "precio": 89.99,
+        "caracteristicas": "Firewall avanzado, monitoreo 24/7, protección DDoS, análisis de tráfico, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Enterprise Security Suite",
+        "descripcion": "Solución de seguridad integral para grandes empresas con sistemas críticos que requieren máxima protección. Incluye análisis de amenazas impulsado por IA, auditorías de seguridad y protección contra ataques avanzados. Perfecto para industrias reguladas como finanzas o salud.",
+        "categoria": "seguridad",
+        "precio": 179.99,
+        "caracteristicas": "Firewall avanzado, monitoreo 24/7, protección DDoS, análisis de amenazas IA, auditorías, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Endpoint Security for Microsoft 365",
+        "descripcion": "Solución de seguridad específica para proteger endpoints que usan Microsoft 365. Ideal para empresas que necesitan proteger dispositivos de empleados que acceden a datos corporativos desde diferentes ubicaciones. Incluye protección contra malware y phishing.",
+        "categoria": "seguridad",
+        "precio": 99.99,
+        "caracteristicas": "Protección de endpoints, anti-malware, anti-phishing, integración con Microsoft 365, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Compliance Security Package",
+        "descripcion": "Paquete de seguridad diseñado para cumplir con normativas estrictas como GDPR, HIPAA o PCI-DSS. Incluye herramientas de auditoría, cifrado avanzado y políticas de acceso para garantizar el cumplimiento normativo. Ideal para empresas en industrias reguladas.",
+        "categoria": "seguridad",
+        "precio": 199.99,
+        "caracteristicas": "Cumplimiento GDPR/HIPAA/PCI-DSS, cifrado avanzado, auditorías, políticas de acceso, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Standard Support Plan",
+        "descripcion": "Plan de soporte técnico básico para resolver incidencias comunes en horario laboral. Ideal para pequeñas empresas que necesitan asistencia ocasional para problemas básicos de TI. Incluye soporte por correo y tiempos de respuesta estándar.",
+        "categoria": "soporte",
+        "precio": 59.99,
+        "caracteristicas": "Soporte por correo, horario laboral, tiempo de respuesta 24h.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "24/7 Support Plan",
+        "descripcion": "Plan de soporte técnico continuo para empresas que necesitan asistencia constante, incluso fuera del horario laboral. Perfecto para empresas con operaciones globales o sistemas críticos. Ofrece soporte multicanal y tiempos de respuesta rápidos.",
+        "categoria": "soporte",
+        "precio": 129.99,
+        "caracteristicas": "Soporte 24/7 por correo y teléfono, tiempo de respuesta 4h, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Dedicated Support Plan",
+        "descripcion": "Plan de soporte técnico premium con un equipo dedicado para empresas con necesidades críticas. Ideal para organizaciones que requieren asistencia personalizada y tiempos de respuesta inmediatos. Incluye un gestor de cuenta dedicado.",
+        "categoria": "soporte",
+        "precio": 249.99,
+        "caracteristicas": "Soporte 24/7 por correo, teléfono y chat, técnico dedicado, tiempo de respuesta 1h, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Support for Microsoft 365",
+        "descripcion": "Plan de soporte técnico especializado para usuarios de Microsoft 365. Ofrece asistencia para configuración, migración y resolución de problemas específicos de Microsoft 365. Ideal para empresas que están adoptando o ya utilizan Microsoft 365.",
+        "categoria": "soporte",
+        "precio": 149.99,
+        "caracteristicas": "Soporte 24/7 para Microsoft 365, configuración y migración, tiempo de respuesta 4h, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Support for Disaster Recovery",
+        "descripcion": "Plan de soporte técnico enfocado en recuperación ante desastres. Diseñado para empresas que necesitan garantizar la continuidad del negocio tras interrupciones. Incluye asistencia para restauración de datos y sistemas críticos.",
+        "categoria": "soporte",
+        "precio": 199.99,
+        "caracteristicas": "Soporte 24/7 para recuperación ante desastres, restauración de datos, tiempo de respuesta 2h, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Microsoft 365 Personal License",
+        "descripcion": "Licencia básica de Microsoft 365 para usuarios individuales o pequeñas empresas que necesitan herramientas esenciales de productividad. Ideal para freelancers o equipos pequeños que buscan una solución simple para gestionar documentos y correos.",
+        "categoria": "licencias",
+        "precio": 69.99,
+        "caracteristicas": "Office básico (Word, Excel), 100 GB OneDrive, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Microsoft 365 Business Standard",
+        "descripcion": "Licencia completa de Microsoft 365 para equipos medianos que necesitan herramientas avanzadas de colaboración. Perfecta para empresas que buscan mejorar la productividad con Teams, Exchange y almacenamiento en la nube. Incluye soporte para migraciones.",
+        "categoria": "licencias",
+        "precio": 149.99,
+        "caracteristicas": "Office completo (Word, Excel, Teams), 1 TB OneDrive, Exchange, SLA 99.9%, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Microsoft 365 Enterprise E5",
+        "descripcion": "Licencia avanzada de Microsoft 365 para grandes empresas con necesidades empresariales complejas. Ofrece herramientas de productividad, seguridad avanzada y análisis. Ideal para organizaciones que necesitan cumplimiento normativo y protección de datos.",
+        "categoria": "licencias",
+        "precio": 299.99,
+        "caracteristicas": "Office completo, almacenamiento ilimitado OneDrive, seguridad avanzada, Power BI, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Microsoft 365 Apps for Business",
+        "descripcion": "Licencia de Microsoft 365 enfocada en aplicaciones de productividad sin servicios de correo o colaboración. Ideal para empresas que solo necesitan herramientas de Office y almacenamiento en la nube, sin Exchange ni Teams.",
+        "categoria": "licencias",
+        "precio": 99.99,
+        "caracteristicas": "Office completo (Word, Excel, PowerPoint), 500 GB OneDrive, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Microsoft 365 Education A3",
+        "descripcion": "Licencia de Microsoft 365 diseñada para instituciones educativas. Ofrece herramientas de productividad y colaboración para estudiantes y profesores, con descuentos especiales. Incluye funciones de seguridad para entornos educativos.",
+        "categoria": "licencias",
+        "precio": 129.99,
+        "caracteristicas": "Office completo, 1 TB OneDrive, Teams para educación, seguridad educativa, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Initial IT Assessment",
+        "descripcion": "Servicio de consultoría básica para evaluar la infraestructura tecnológica de una empresa. Ideal para pequeñas empresas que necesitan un análisis inicial para identificar áreas de mejora. Incluye un informe básico con recomendaciones.",
+        "categoria": "consultoria",
+        "precio": 199.99,
+        "caracteristicas": "Análisis inicial, 1 sesión de consultoría, informe básico.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Advanced Migration Planning",
+        "descripcion": "Servicio de consultoría para planificar migraciones tecnológicas complejas, como la migración a Microsoft 365. Perfecto para empresas medianas que necesitan una hoja de ruta detallada para migrar sistemas sin interrupciones. Incluye soporte post-migración.",
+        "categoria": "consultoria",
+        "precio": 499.99,
+        "caracteristicas": "Análisis detallado, 3 sesiones de consultoría, hoja de ruta, soporte post-migración.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Full-Service IT Transformation",
+        "descripcion": "Servicio de consultoría integral para transformar la infraestructura tecnológica de grandes empresas. Ideal para organizaciones que buscan modernizar sus sistemas con un enfoque completo. Incluye soporte continuo y auditorías.",
+        "categoria": "consultoria",
+        "precio": 999.99,
+        "caracteristicas": "Análisis exhaustivo, sesiones ilimitadas, informe premium, soporte 3 meses, auditorías.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Compliance Consulting",
+        "descripcion": "Servicio de consultoría especializado en cumplimiento normativo (GDPR, HIPAA, PCI-DSS). Diseñado para empresas que necesitan garantizar que sus sistemas cumplen con regulaciones estrictas. Incluye auditorías y políticas de cumplimiento.",
+        "categoria": "consultoria",
+        "precio": 799.99,
+        "caracteristicas": "Consultoría de cumplimiento, auditorías, políticas GDPR/HIPAA/PCI-DSS, soporte 2 meses.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Security Consulting",
+        "descripcion": "Servicio de consultoría enfocado en mejorar la seguridad de TI de una empresa. Ideal para organizaciones que enfrentan amenazas avanzadas y necesitan un plan de seguridad robusto. Incluye análisis de riesgos y recomendaciones de protección.",
+        "categoria": "consultoria",
+        "precio": 599.99,
+        "caracteristicas": "Análisis de riesgos, 3 sesiones de consultoría, plan de seguridad, soporte post-consultoría.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Microsoft 365 Archive Basic",
+        "descripcion": "Solución de archivado básica para Microsoft 365, diseñada para pequeñas empresas que necesitan cumplir con requisitos básicos de retención. Ideal para archivar correos electrónicos y documentos con integración nativa en Microsoft 365.",
+        "categoria": "archivado",
+        "precio": 29.99,
+        "caracteristicas": "Archivado ilimitado, retención de 1 año, integración con Microsoft 365, cumplimiento básico.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Enterprise Email Archiving",
+        "descripcion": "Solución avanzada de archivado para correo electrónico, diseñada para empresas medianas que necesitan cumplir con normativas de retención. Ofrece búsqueda avanzada y políticas de retención personalizadas para garantizar el cumplimiento normativo.",
+        "categoria": "archivado",
+        "precio": 79.99,
+        "caracteristicas": "Archivado ilimitado, retención de 5 años, búsqueda avanzada, cumplimiento normativo, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Compliance Archiving Suite",
+        "descripcion": "Solución premium de archivado para grandes empresas con requisitos estrictos de cumplimiento (GDPR, HIPAA). Incluye auditorías, retención a largo plazo y herramientas de eDiscovery para gestionar datos sensibles.",
+        "categoria": "archivado",
+        "precio": 149.99,
+        "caracteristicas": "Archivado ilimitado, retención de 10 años, cumplimiento avanzado, eDiscovery, auditorías, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Email Archiving for Teams",
+        "descripcion": "Solución de archivado específica para Microsoft Teams, diseñada para empresas que necesitan archivar comunicaciones de Teams junto con correos electrónicos. Ideal para garantizar el cumplimiento en entornos colaborativos.",
+        "categoria": "archivado",
+        "precio": 99.99,
+        "caracteristicas": "Archivado de Teams y correo, retención de 3 años, búsqueda avanzada, cumplimiento normativo.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Long-Term Data Archiving",
+        "descripcion": "Solución de archivado a largo plazo para datos empresariales, incluyendo correos electrónicos, documentos y registros. Perfecta para empresas que necesitan almacenar datos históricos de manera segura y accesible para auditorías.",
+        "categoria": "archivado",
+        "precio": 119.99,
+        "caracteristicas": "Archivado ilimitado, retención de 7 años, búsqueda avanzada, cumplimiento normativo, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Elite Server Essentials",
+        "descripcion": "Servidor dedicado para pequeñas empresas que necesitan un entorno simple para hospedar aplicaciones básicas o sitios web. Ideal para startups con necesidades mínimas de procesamiento.",
+        "categoria": "servidores",
+        "precio": 89.99,
+        "caracteristicas": "2 vCPUs, 4 GB RAM, 100 GB HDD, soporte estándar, ancho de banda 1 TB.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Pro Server Accelerator",
+        "descripcion": "Servidor de alto rendimiento para empresas medianas que manejan cargas de trabajo moderadas, como bases de datos o aplicaciones web. Ofrece escalabilidad básica y redundancia.",
+        "categoria": "servidores",
+        "precio": 219.99,
+        "caracteristicas": "4 vCPUs, 16 GB RAM, 500 GB SSD, redundancia básica, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Ultimate Server Dominator",
+        "descripcion": "Servidor premium para organizaciones grandes con aplicaciones críticas que requieren alta disponibilidad y potencia. Incluye optimizaciones para big data y virtualización.",
+        "categoria": "servidores",
+        "precio": 449.99,
+        "caracteristicas": "16 vCPUs, 64 GB RAM, 2 TB SSD, redundancia geográfica, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Virtualization Server Pro",
+        "descripcion": "Servidor optimizado para entornos virtualizados, ideal para empresas que usan hipervisores como VMware o Hyper-V. Soporta múltiples máquinas virtuales con eficiencia.",
+        "categoria": "servidores",
+        "precio": 329.99,
+        "caracteristicas": "8 vCPUs, 32 GB RAM, 1 TB SSD, soporte para virtualización, ancho de banda ilimitado.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "DevTest Server Lite",
+        "descripcion": "Servidor económico para entornos de desarrollo y pruebas, perfecto para equipos de software que necesitan probar aplicaciones sin afectar la producción.",
+        "categoria": "servidores",
+        "precio": 109.99,
+        "caracteristicas": "2 vCPUs, 8 GB RAM, 200 GB HDD, aislamiento de entornos, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "NAS Storage Starter Pack",
+        "descripcion": "Dispositivo de almacenamiento en red para pequeñas oficinas que necesitan compartir archivos de manera simple. Ideal para backups locales y acceso compartido.",
+        "categoria": "almacenamiento",
+        "precio": 159.99,
+        "caracteristicas": "2 bahías, 4 TB capacidad, RAID 0/1, acceso remoto básico.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "SAN Storage Enterprise Edition",
+        "descripcion": "Sistema de almacenamiento en área de red para empresas medianas con necesidades de alto rendimiento y escalabilidad. Soporta volúmenes grandes de datos.",
+        "categoria": "almacenamiento",
+        "precio": 549.99,
+        "caracteristicas": "10 bahías, 20 TB capacidad, RAID 5/6, fibra óptica, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Hybrid Storage Fusion",
+        "descripcion": "Solución híbrida que combina almacenamiento local con la nube para flexibilidad. Ideal para empresas que migran datos gradualmente.",
+        "categoria": "almacenamiento",
+        "precio": 329.99,
+        "caracteristicas": "5 bahías, 10 TB local + 500 GB cloud, sincronización automática, cifrado.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Big Data Storage Colossus",
+        "descripcion": "Almacenamiento escalable para análisis de big data, diseñado para empresas que procesan grandes volúmenes de información. Incluye herramientas de compresión.",
+        "categoria": "almacenamiento",
+        "precio": 649.99,
+        "caracteristicas": "20 bahías, 50 TB capacidad, compatible con Hadoop, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "High-Speed SSD Storage Blitz",
+        "descripcion": "Almacenamiento basado en SSD para aplicaciones que requieren velocidad extrema, como bases de datos en tiempo real.",
+        "categoria": "almacenamiento",
+        "precio": 379.99,
+        "caracteristicas": "8 bahías, 16 TB SSD, RAID 10, monitoreo avanzado.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Corporate Router Essentials",
+        "descripcion": "Router simple para conectar redes pequeñas, ideal para oficinas con conexiones básicas a internet. Ofrece firewall integrado.",
+        "categoria": "red y acceso",
+        "precio": 69.99,
+        "caracteristicas": "4 puertos Ethernet, WiFi 802.11n, firewall básico, QoS simple.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Managed Switch Pro",
+        "descripcion": "Switch de red gestionado para optimizar el tráfico en redes medianas. Soporta VLAN y monitoreo de puertos.",
+        "categoria": "red y acceso",
+        "precio": 139.99,
+        "caracteristicas": "24 puertos Gigabit, VLAN, PoE, interfaz web de gestión.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Advanced Network Firewall Shield",
+        "descripcion": "Firewall hardware para proteger redes empresariales contra amenazas externas. Incluye VPN y detección de intrusiones.",
+        "categoria": "red y acceso",
+        "precio": 269.99,
+        "caracteristicas": "Soporte VPN, IDS/IPS, filtrado de contenido, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Enterprise WiFi Access Point",
+        "descripcion": "Punto de acceso WiFi para cubrir áreas grandes en oficinas, ideal para entornos con muchos usuarios móviles.",
+        "categoria": "red y acceso",
+        "precio": 109.99,
+        "caracteristicas": "WiFi 6, cobertura 500m², gestión centralizada, seguridad WPA3.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Remote Access VPN Gateway",
+        "descripcion": "Puerta de enlace VPN para empleados remotos, asegurando conexiones seguras a la red corporativa.",
+        "categoria": "red y acceso",
+        "precio": 189.99,
+        "caracteristicas": "Soporte 50 usuarios, cifrado AES-256, integración con AD, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Basic Cloud Backup Guardian",
+        "descripcion": "Servicio de backup en la nube para datos esenciales de pequeñas empresas. Automatiza copias de seguridad diarias.",
+        "categoria": "backups",
+        "precio": 49.99,
+        "caracteristicas": "100 GB almacenamiento, backups diarios, recuperación simple, cifrado.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Server Backup Recovery Pro",
+        "descripcion": "Solución de backup para servidores, con recuperación rápida en caso de fallos. Ideal para entornos críticos.",
+        "categoria": "backups",
+        "precio": 139.99,
+        "caracteristicas": "Backups incrementales, recuperación bare-metal, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Real-Time Data Backup Sentinel",
+        "descripcion": "Backup continuo en tiempo real para empresas que no pueden permitirse pérdidas de datos. Incluye replicación.",
+        "categoria": "backups",
+        "precio": 219.99,
+        "caracteristicas": "Replicación en tiempo real, 1 TB almacenamiento, SLA 99.999%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Microsoft 365 Backup Shield",
+        "descripcion": "Backup especializado para datos de Microsoft 365, protegiendo correos y archivos en la nube.",
+        "categoria": "backups",
+        "precio": 99.99,
+        "caracteristicas": "Backups ilimitados, retención 1 año, integración con OneDrive/Exchange.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Disaster Offsite Backup Fortress",
+        "descripcion": "Backup externo para recuperación ante desastres, con almacenamiento en ubicaciones remotas.",
+        "categoria": "backups",
+        "precio": 159.99,
+        "caracteristicas": "Almacenamiento offsite, pruebas de recuperación, soporte prioritario.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Endpoint Antivirus Essentials",
+        "descripcion": "Protección antivirus simple para dispositivos de empleados en pequeñas empresas.",
+        "categoria": "seguridad",
+        "precio": 39.99,
+        "caracteristicas": "Escaneo en tiempo real, actualizaciones automáticas, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Threat Monitoring SIEM Elite",
+        "descripcion": "Sistema de gestión de eventos e información de seguridad para detectar amenazas avanzadas.",
+        "categoria": "seguridad",
+        "precio": 219.99,
+        "caracteristicas": "Monitoreo 24/7, alertas IA, integración con logs, SLA 99.9%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Enterprise Data Encryption Vault",
+        "descripcion": "Solución para encriptar datos sensibles en reposo y en tránsito. Ideal para cumplimiento normativo.",
+        "categoria": "seguridad",
+        "precio": 109.99,
+        "caracteristicas": "Cifrado AES-256, gestión de claves, auditorías de acceso.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Ransomware Protection Defender",
+        "descripcion": "Software especializado en detectar y bloquear ataques de ransomware en tiempo real.",
+        "categoria": "seguridad",
+        "precio": 139.99,
+        "caracteristicas": "Detección comportamental, backups integrados, soporte 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Advanced MFA Security Gate",
+        "descripcion": "Sistema MFA para accesos seguros, integrando biometría y tokens hardware.",
+        "categoria": "seguridad",
+        "precio": 89.99,
+        "caracteristicas": "MFA con biometría, integración con AD, políticas personalizadas.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Server OS Enterprise License",
+        "descripcion": "Licencia de sistema operativo para servidores, optimizado para entornos empresariales estables.",
+        "categoria": "sistemas",
+        "precio": 159.99,
+        "caracteristicas": "Windows Server o Linux Enterprise, soporte de actualizaciones, clustering.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Content Management System Pro",
+        "descripcion": "Plataforma CMS para gestionar sitios web y contenidos digitales de manera eficiente.",
+        "categoria": "sistemas",
+        "precio": 109.99,
+        "caracteristicas": "Interfaz intuitiva, plantillas personalizables, SEO integrado.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Enterprise Virtualization Hub",
+        "descripcion": "Hipervisor para crear y gestionar máquinas virtuales en infraestructuras grandes.",
+        "categoria": "sistemas",
+        "precio": 329.99,
+        "caracteristicas": "Soporte para múltiples hosts, migración en vivo, alta disponibilidad.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Basic Web Hosting Starter",
+        "descripcion": "Hosting compartido para sitios web pequeños, ideal para empresas nuevas en línea.",
+        "categoria": "web y dominios",
+        "precio": 29.99,
+        "caracteristicas": "10 GB espacio, dominio incluido, SSL básico, soporte por correo.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Premium Domain Registration Service",
+        "descripcion": "Servicio para registrar y gestionar dominios premium con extensiones especiales.",
+        "categoria": "web y dominios",
+        "precio": 59.99,
+        "caracteristicas": "Dominio .com/.net, WHOIS privacy, renovación automática.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "VPS Web Hosting Accelerator",
+        "descripcion": "VPS dedicado para aplicaciones web de alto tráfico, con control total del servidor.",
+        "categoria": "web y dominios",
+        "precio": 109.99,
+        "caracteristicas": "4 vCPUs, 8 GB RAM, 100 GB SSD, panel de control, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Business Email Essentials",
+        "descripcion": "Correo electrónico corporativo con almacenamiento básico y filtros antispam.",
+        "categoria": "correo",
+        "precio": 39.99,
+        "caracteristicas": "50 GB por usuario, IMAP/POP3, antispam, soporte estándar.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Collaborative Email Pro",
+        "descripcion": "Correo con herramientas de colaboración integradas, como calendarios compartidos.",
+        "categoria": "correo",
+        "precio": 89.99,
+        "caracteristicas": "100 GB por usuario, integración con Teams, archivado automático.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Secure Email Archiving Suite",
+        "descripcion": "Solución de archivado para correos electrónicos con retención a largo plazo y búsqueda avanzada.",
+        "categoria": "correo",
+        "precio": 99.99,
+        "caracteristicas": "Archivado ilimitado, retención 5 años, eDiscovery, cumplimiento normativo.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "SQL Database Essentials",
+        "descripcion": "Instancia de base de datos SQL para aplicaciones pequeñas con consultas simples.",
+        "categoria": "bases de datos",
+        "precio": 59.99,
+        "caracteristicas": "MySQL o PostgreSQL, 10 GB almacenamiento, backups diarios.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "NoSQL Big Data Database Engine",
+        "descripcion": "BD NoSQL escalable para manejar datos no estructurados en volúmenes grandes.",
+        "categoria": "bases de datos",
+        "precio": 159.99,
+        "caracteristicas": "MongoDB o Cassandra, clustering, replicación, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Cloud Database Optimizer",
+        "descripcion": "Base de datos en la nube con optimizaciones para rendimiento y escalabilidad automática.",
+        "categoria": "bases de datos",
+        "precio": 129.99,
+        "caracteristicas": "Soporte SQL/NoSQL, auto-escalado, backups automáticos, SLA 99.9%.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Enterprise Productivity Software Suite",
+        "descripcion": "Suite de software para productividad, incluyendo editores y gestores de proyectos.",
+        "categoria": "software y apps",
+        "precio": 109.99,
+        "caracteristicas": "Licencias para 10 usuarios, actualizaciones anuales, integración cloud.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Mobile Task Management App",
+        "descripcion": "Aplicación móvil para gestionar tareas y proyectos en equipos remotos.",
+        "categoria": "software y apps",
+        "precio": 69.99,
+        "caracteristicas": "Sync en tiempo real, notificaciones push, versión iOS/Android.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Custom App Development Kit",
+        "descripcion": "Kit para desarrollar aplicaciones personalizadas con herramientas low-code.",
+        "categoria": "software y apps",
+        "precio": 199.99,
+        "caracteristicas": "Plataforma low-code, integraciones API, soporte para deployment.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Basic User Access Manager",
+        "descripcion": "Herramienta para gestionar accesos y permisos en sistemas pequeños.",
+        "categoria": "usuarios y permisos",
+        "precio": 49.99,
+        "caracteristicas": "Active Directory básico, roles predefinidos, auditoría simple.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Advanced Permission Control System",
+        "descripcion": "Sistema avanzado para controlar permisos granulares y políticas de acceso.",
+        "categoria": "usuarios y permisos",
+        "precio": 99.99,
+        "caracteristicas": "Políticas basadas en roles, MFA integrado, logs de acceso detallados.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Identity Management Enterprise",
+        "descripcion": "Solución de gestión de identidades para entornos grandes con federación.",
+        "categoria": "usuarios y permisos",
+        "precio": 149.99,
+        "caracteristicas": "Federacion con proveedores externos, single sign-on, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Basic Network Monitoring Tool",
+        "descripcion": "Herramienta para monitorear el rendimiento de la red en tiempo real.",
+        "categoria": "monitorizacion",
+        "precio": 79.99,
+        "caracteristicas": "Alertas por email, dashboards básicos, soporte para 50 dispositivos.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "AI-Powered Monitoring Elite",
+        "descripcion": "Sistema de monitoreo impulsado por IA para predecir fallos en infraestructuras.",
+        "categoria": "monitorizacion",
+        "precio": 219.99,
+        "caracteristicas": "Predicciones IA, integración con SIEM, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Comprehensive IT Monitoring Suite",
+        "descripcion": "Suite completa para monitorear servidores, redes y aplicaciones en un solo dashboard.",
+        "categoria": "monitorizacion",
+        "precio": 159.99,
+        "caracteristicas": "Monitoreo unificado, alertas personalizadas, informes automatizados.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Custom API Integration Service",
+        "descripcion": "Servicio de API para conectar sistemas externos con plataformas internas.",
+        "categoria": "apis y scripts",
+        "precio": 99.99,
+        "caracteristicas": "APIs RESTful, autenticación OAuth, documentación completa.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Automation Scripting Pro",
+        "descripcion": "Desarrollo de scripts para automatizar tareas repetitivas en TI.",
+        "categoria": "apis y scripts",
+        "precio": 109.99,
+        "caracteristicas": "Scripts en Python/Bash, testing incluido, documentación.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Enterprise API Gateway",
+        "descripcion": "Puerta de enlace API para gestionar y securizar múltiples APIs en entornos grandes.",
+        "categoria": "apis y scripts",
+        "precio": 179.99,
+        "caracteristicas": "Rate limiting, caching, monitoreo de APIs, integración con seguridad.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "IT Change Management Consulting",
+        "descripcion": "Servicio de consultoría para asesorar en actualizaciones y optimizaciones de TI.",
+        "categoria": "cambios y mejoras",
+        "precio": 329.99,
+        "caracteristicas": "Análisis de necesidades, plan de mejoras, soporte post-implementación.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "System Upgrade Administration",
+        "descripcion": "Administración profesional para upgrades de sistemas, asegurando mínima interrupción.",
+        "categoria": "cambios y mejoras",
+        "precio": 249.99,
+        "caracteristicas": "Evaluación pre-upgrade, implementación, testing post-upgrade.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Digital Transformation Advisory",
+        "descripcion": "Asesoría integral para transformar procesos digitales en empresas.",
+        "categoria": "cambios y mejoras",
+        "precio": 499.99,
+        "caracteristicas": "Estrategia personalizada, implementación guiada, seguimiento 3 meses.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Remote Teams Microsoft 365 License",
+        "descripcion": "Licencia optimizada para trabajo remoto con herramientas de colaboración.",
+        "categoria": "microsoft 365",
+        "precio": 139.99,
+        "caracteristicas": "Teams avanzado, SharePoint, soporte remoto 24/7.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Microsoft 365 Security Add-On",
+        "descripcion": "Complemento de seguridad para Microsoft 365 con protección avanzada.",
+        "categoria": "microsoft 365",
+        "precio": 79.99,
+        "caracteristicas": "Anti-malware, DLP, integración con Azure AD.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Microsoft 365 Enterprise Bundle",
+        "descripcion": "Paquete completo de Microsoft 365 para empresas grandes con todas las herramientas.",
+        "categoria": "microsoft 365",
+        "precio": 249.99,
+        "caracteristicas": "Office completo, seguridad avanzada, analíticas, SLA 99.99%.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Basic ERP Starter for SMBs",
+        "descripcion": "Sistema ERP simple para gestionar operaciones básicas como inventarios.",
+        "categoria": "erp / crm",
+        "precio": 219.99,
+        "caracteristicas": "Módulos de ventas/inventario, informes básicos, integración con contabilidad.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Advanced CRM Sales Booster",
+        "descripcion": "Plataforma CRM para gestionar leads y ventas en equipos grandes.",
+        "categoria": "erp / crm",
+        "precio": 329.99,
+        "caracteristicas": "Automatización de ventas, analíticas IA, integración con email.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Integrated ERP-CRM Solution",
+        "descripcion": "Solución combinada de ERP y CRM para gestión integral de negocios.",
+        "categoria": "erp / crm",
+        "precio": 449.99,
+        "caracteristicas": "Módulos completos, customización, soporte 24/7.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Automated Invoicing Essentials",
+        "descripcion": "Software para generar y enviar facturas automáticamente.",
+        "categoria": "facturacion",
+        "precio": 89.99,
+        "caracteristicas": "Plantillas personalizables, pagos en línea, recordatorios automáticos.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "E-Commerce Billing Pro",
+        "descripcion": "Solución de facturación integrada con plataformas de comercio electrónico.",
+        "categoria": "facturacion",
+        "precio": 159.99,
+        "caracteristicas": "Integración con Shopify/WooCommerce, impuestos automáticos, informes.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Enterprise Billing Management Suite",
+        "descripcion": "Suite avanzada para gestión de facturación en empresas grandes con múltiples divisas.",
+        "categoria": "facturacion",
+        "precio": 199.99,
+        "caracteristicas": "Facturación multimoneda, integraciones ERP, auditorías automáticas.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Agile Cloud Dev Resources",
+        "descripcion": "Recursos cloud para entornos de desarrollo ágil y escalable.",
+        "categoria": "cloud",
+        "precio": 99.99,
+        "caracteristicas": "Contenedores Docker, auto-escalado, integración CI/CD.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Hybrid Cloud Fusion Platform",
+        "descripcion": "Solución cloud híbrida para combinar on-prem y cloud pública.",
+        "categoria": "cloud",
+        "precio": 269.99,
+        "caracteristicas": "Sincronización de datos, gestión unificada, seguridad híbrida.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Multi-Cloud Management Elite",
+        "descripcion": "Plataforma para gestionar múltiples proveedores cloud en un solo panel.",
+        "categoria": "cloud",
+        "precio": 349.99,
+        "caracteristicas": "Orquestación multi-cloud, optimización de costos, monitoreo integrado.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "SAP Business One License",
+        "descripcion": "Licencia para SAP Business One, ideal para pequeñas y medianas empresas gestionando operaciones integradas.",
+        "categoria": "licencias",
+        "precio": 499.99,
+        "caracteristicas": "Módulos de finanzas, ventas, inventario; soporte estándar.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Dynamics 365 Business Central License",
+        "descripcion": "Licencia para Microsoft Dynamics 365 Business Central, solución ERP en la nube para SMBs.",
+        "categoria": "licencias",
+        "precio": 199.99,
+        "caracteristicas": "Gestión financiera, cadena de suministro, ventas; integración con Microsoft 365.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "SQL Server Standard License",
+        "descripcion": "Licencia estándar para Microsoft SQL Server, para bases de datos empresariales de tamaño medio.",
+        "categoria": "licencias",
+        "precio": 899.99,
+        "caracteristicas": "Soporte para 16 cores, alta disponibilidad, seguridad integrada.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Oracle Database Enterprise Edition",
+        "descripcion": "Licencia para Oracle Database EE, para entornos de alto rendimiento y misión crítica.",
+        "categoria": "licencias",
+        "precio": 1499.99,
+        "caracteristicas": "Particionamiento, compresión avanzada, Real Application Clusters.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Office 365 E3 License",
+        "descripcion": "Licencia para Office 365 E3, con aplicaciones de productividad y colaboración avanzada.",
+        "categoria": "licencias",
+        "precio": 20,
+        "caracteristicas": "Word, Excel, Teams; 1 TB OneDrive; seguridad básica.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "IT Infrastructure Audit Service",
+        "descripcion": "Servicio de auditoría profesional para evaluar la infraestructura TI y recomendar mejoras.",
+        "categoria": "consultoria",
+        "precio": 599.99,
+        "caracteristicas": "Análisis completo, informe detallado, sesión de recomendaciones.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Cloud Migration Administration",
+        "descripcion": "Administración experta para migrar sistemas a la nube con mínima disrupción.",
+        "categoria": "consultoria",
+        "precio": 799.99,
+        "caracteristicas": "Planificación, ejecución, optimización post-migración.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Cybersecurity Risk Assessment",
+        "descripcion": "Evaluación profesional de riesgos de ciberseguridad con plan de mitigación.",
+        "categoria": "consultoria",
+        "precio": 699.99,
+        "caracteristicas": "Escaneo de vulnerabilidades, análisis de amenazas, estrategias de defensa.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "Custom Software Development Consulting",
+        "descripcion": "Consultoría para desarrollo de software personalizado adaptado a necesidades específicas.",
+        "categoria": "consultoria",
+        "precio": 999.99,
+        "caracteristicas": "Requerimientos, diseño, prototipado, soporte inicial.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Network Optimization Service",
+        "descripcion": "Servicio de optimización de redes para mejorar rendimiento y eficiencia.",
+        "categoria": "consultoria",
+        "precio": 499.99,
+        "caracteristicas": "Análisis de tráfico, reconfiguración, monitoreo inicial.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Data Analytics Advisory",
+        "descripcion": "Asesoría en análisis de datos para extraer insights accionables de big data.",
+        "categoria": "consultoria",
+        "precio": 899.99,
+        "caracteristicas": "Estrategia de datos, herramientas recomendadas, implementación guiada.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Compliance Management Administration",
+        "descripcion": "Administración para asegurar cumplimiento con normativas como GDPR o HIPAA.",
+        "categoria": "consultoria",
+        "precio": 599.99,
+        "caracteristicas": "Auditorías regulares, políticas de cumplimiento, entrenamiento básico.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "ERP Implementation Service",
+        "descripcion": "Servicio profesional para implementar sistemas ERP como SAP o Dynamics.",
+        "categoria": "consultoria",
+        "precio": 1499.99,
+        "caracteristicas": "Configuración, training, soporte post-implementación 6 meses.",
+        "esfuerzo": "alto"
+    },
+    {
+        "nombre": "Remote IT Support Administration",
+        "descripcion": "Administración de soporte TI remoto para resolver incidencias diarias.",
+        "categoria": "soporte",
+        "precio": 299.99,
+        "caracteristicas": "Soporte 24/7 remoto, resolución rápida, informes mensuales.",
+        "esfuerzo": "medio"
+    },
+    {
+        "nombre": "On-Site Hardware Maintenance",
+        "descripcion": "Mantenimiento profesional en sitio para hardware y servidores.",
+        "categoria": "soporte",
+        "precio": 399.99,
+        "caracteristicas": "Visitas programadas, reparaciones, reemplazos de partes.",
+        "esfuerzo": "bajo"
+    },
+    {
+        "nombre": "Premium License Renewal Service",
+        "descripcion": "Servicio para gestionar renovaciones de licencias de software como Office o SQL.",
+        "categoria": "soporte",
+        "precio": 199.99,
+        "caracteristicas": "Monitoreo de expiraciones, negociaciones de precios, actualizaciones.",
+        "esfuerzo": "bajo"
+    }
+]

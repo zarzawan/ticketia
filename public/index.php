@@ -264,11 +264,6 @@ foreach ($datos_estados as $dato_estado) {
     }
 }
 
-// Aviso de vista filtrada (los filtros persisten via localStorage y pueden
-// ocultar incidencias recientes sin que el usuario lo recuerde).
-$hay_filtros_activos = $busqueda !== '' || $filtro_tipo !== '' || $filtro_urgencia !== ''
-    || $filtro_estado !== '' || $filtro_desde !== '' || $filtro_hasta !== '' || $filtro_asignado !== '';
-
 // Siguiente tramo del selector de limite para el boton "Ver mas".
 $siguiente_limite = null;
 if ($limite === 20) {
@@ -330,13 +325,6 @@ if ($limite === 20) {
 
     <?php if ($mensaje_exito): ?>
         <div class="success-message">Incidencia registrada correctamente.</div>
-    <?php endif; ?>
-
-    <?php if ($hay_filtros_activos): ?>
-        <div class="filtros-aviso">
-            Estas viendo una vista filtrada del tablero: <?= $kpi_total ?> incidencia<?= $kpi_total === 1 ? '' : 's' ?> coinciden con los filtros y el resto queda oculto.
-            <a href="#" onclick="limpiarFiltros(); return false;">Quitar filtros y ver todo</a>
-        </div>
     <?php endif; ?>
 
     <div class="top-row-grid">
