@@ -12,10 +12,10 @@ if (!$id_incidencia) {
     exit;
 }
 
-// Actualizar estado y fecha de cierre
-$sql = "UPDATE incidencias SET estado = 'cerrada', fecha_cierre = NOW() WHERE id = :id";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([':id' => $id_incidencia]);
+if (!incidencia_cambiar_estado($pdo, $id_incidencia, 'cerrada')) {
+    header('Location: index.php?error=1');
+    exit;
+}
 auditar($pdo, 'cerrar_incidencia', "incidencia #$id_incidencia");
 
 // Redirigir de nuevo

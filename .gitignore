@@ -6,3 +6,5 @@
 Thumbs.db
 desktop.ini
 .DS_Store
+/almacen/adjuntos/*
+!/almacen/adjuntos/.gitkeep

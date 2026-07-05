@@ -2096,3 +2096,118 @@ a.stat:hover {
     min-height: 28px;
     font-size: 12px;
 }
+
+/* ============================================================
+   Fase 2: notas internas, adjuntos y panel de administracion
+   ============================================================ */
+
+.composer-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.composer-check input {
+    accent-color: var(--warning);
+}
+
+.badge-interna {
+    display: inline-block;
+    background: rgba(255, 149, 0, 0.14);
+    color: var(--warning);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.mensaje-card.interna {
+    border-left: 3px solid var(--warning);
+    background: rgba(255, 149, 0, 0.05);
+}
+
+.timeline-item.nota-interna .timeline-dot {
+    background: var(--warning);
+}
+
+.timeline-item.estado .timeline-dot {
+    background: var(--surface-3);
+    border: 2px solid var(--muted);
+    width: 9px;
+    height: 9px;
+}
+
+/* Adjuntos */
+.adjuntos-lista {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    display: grid;
+}
+
+.adjuntos-lista li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13.5px;
+}
+
+.adjuntos-lista li:last-child {
+    border-bottom: 0;
+}
+
+.adjuntos-lista a {
+    font-weight: 500;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.adjunto-meta {
+    color: var(--muted);
+    font-size: 12px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.adjuntos-form input[type="file"] {
+    flex: 1;
+    min-width: 0;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--surface-2);
+}
+
+/* Panel de administracion */
+.admin-nav {
+    margin-bottom: 4px;
+}
+
+.fila-apagada td {
+    opacity: 0.5;
+}
+
+.logs-table td .kanban-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 9px;
+    vertical-align: middle;
+}
+
+/* Controles en linea dentro de barras de herramientas */
+.page-tools input[type="text"],
+.page-tools input[type="date"],
+.page-tools select {
+    width: auto;
+}

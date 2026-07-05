@@ -7,7 +7,11 @@ if ($id === false || $id === null) {
     exit;
 }
 
-$sql_incidencia = "SELECT incidencias.*, (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre FROM incidencias WHERE id = :id";
+$sql_incidencia = "SELECT incidencias.*,
+    (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre,
+    (SELECT nombre FROM usuarios u2 WHERE u2.id = incidencias.creado_por) AS creador_nombre,
+    (SELECT nombre FROM clientes c WHERE c.id = incidencias.cliente_id) AS cliente_nombre
+    FROM incidencias WHERE id = :id";
 $stmt_incidencia = $pdo->prepare($sql_incidencia);
 $stmt_incidencia->execute([':id' => $id]);
 $incidencia = $stmt_incidencia->fetch(PDO::FETCH_ASSOC);
@@ -19,10 +23,23 @@ if (!$incidencia) {
 
 $asignables = usuarios_asignables($pdo);
 
-$sql_mensajes = "SELECT autor, mensaje, fecha FROM mensajes WHERE id_incidencia = :id ORDER BY fecha ASC";
+$sql_mensajes = "SELECT m.autor, m.mensaje, m.fecha, m.interno, u.nombre AS usuario_nombre
+                  FROM mensajes m
+                  LEFT JOIN usuarios u ON u.id = m.usuario_id
+                  WHERE m.id_incidencia = :id ORDER BY m.fecha ASC";
 $stmt_mensajes = $pdo->prepare($sql_mensajes);
 $stmt_mensajes->execute([':id' => $id]);
 $mensajes = $stmt_mensajes->fetchAll(PDO::FETCH_ASSOC);
+
+$adjuntos = adjuntos_de($pdo, (int)$id);
+
+$sql_cambios = "SELECT c.estado_anterior, c.estado_nuevo, c.fecha, u.nombre AS usuario_nombre
+                FROM cambios_estado c
+                LEFT JOIN usuarios u ON u.id = c.usuario_id
+                WHERE c.id_incidencia = :id ORDER BY c.fecha ASC";
+$stmt_cambios = $pdo->prepare($sql_cambios);
+$stmt_cambios->execute([':id' => $id]);
+$cambios_estado = $stmt_cambios->fetchAll(PDO::FETCH_ASSOC);
 
 $sql_reaperturas = "SELECT motivo, fecha FROM reaperturas WHERE id_incidencia = :id ORDER BY fecha ASC";
 $stmt_reaperturas = $pdo->prepare($sql_reaperturas);
@@ -79,6 +96,12 @@ if ($mostrar_traduccion && ($incidencia['idioma'] ?? 'es') !== 'es') {
     }
 
     if (is_array($decoded)) {
+        // La traduccion cacheada solo lleva autor/mensaje/fecha: recuperar
+        // interno y nombre de usuario del original por posicion.
+        foreach ($decoded['mensajes'] as $i => $m) {
+            $decoded['mensajes'][$i]['interno'] = $mensajes[$i]['interno'] ?? 0;
+            $decoded['mensajes'][$i]['usuario_nombre'] = $mensajes[$i]['usuario_nombre'] ?? null;
+        }
         $traduccion = $decoded;
     }
 }
@@ -93,11 +116,22 @@ $timeline[] = [
 
 foreach ($traduccion['mensajes'] as $mensaje) {
     $autor = strtolower((string)($mensaje['autor'] ?? 'tecnico'));
+    $es_interno_msg = !empty($mensaje['interno']);
+    $quien = (string)($mensaje['usuario_nombre'] ?? ($autor === 'cliente' ? 'cliente' : 'tecnico'));
     $timeline[] = [
-        'tipo' => $autor === 'cliente' ? 'mensaje-cliente' : 'mensaje-tecnico',
-        'titulo' => 'Mensaje de ' . ($autor === 'cliente' ? 'cliente' : 'tecnico'),
+        'tipo' => $es_interno_msg ? 'nota-interna' : ($autor === 'cliente' ? 'mensaje-cliente' : 'mensaje-tecnico'),
+        'titulo' => ($es_interno_msg ? 'Nota interna de ' : 'Mensaje de ') . $quien,
         'descripcion' => (string)($mensaje['mensaje'] ?? ''),
         'fecha' => (string)($mensaje['fecha'] ?? '')
+    ];
+}
+
+foreach ($cambios_estado as $cambio) {
+    $timeline[] = [
+        'tipo' => 'estado',
+        'titulo' => 'Estado: ' . ui_estado_label((string)($cambio['estado_anterior'] ?? '')) . ' -> ' . ui_estado_label((string)$cambio['estado_nuevo']),
+        'descripcion' => $cambio['usuario_nombre'] !== null ? 'por ' . $cambio['usuario_nombre'] : '',
+        'fecha' => (string)$cambio['fecha']
     ];
 }
 
@@ -110,7 +144,7 @@ foreach ($reaperturas as $reapertura) {
     ];
 }
 
-if (!empty($incidencia['fecha_cierre'])) {
+if (!empty($incidencia['fecha_cierre']) && empty($cambios_estado)) {
     $timeline[] = [
         'tipo' => 'cierre',
         'titulo' => 'Incidencia cerrada',
@@ -251,10 +285,14 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                 <?php if (!empty($traduccion['mensajes'])): ?>
                     <div class="mensajes-grid">
                         <?php foreach ($traduccion['mensajes'] as $mensaje): ?>
-                            <?php $is_cliente = strtolower((string)($mensaje['autor'] ?? '')) === 'cliente'; ?>
-                            <div class="mensaje-card <?= $is_cliente ? 'cliente' : 'tecnico' ?>">
+                            <?php
+                            $is_cliente = strtolower((string)($mensaje['autor'] ?? '')) === 'cliente';
+                            $es_interno_msg = !empty($mensaje['interno']);
+                            $quien_msg = (string)($mensaje['usuario_nombre'] ?? ($is_cliente ? 'Cliente' : 'Tecnico'));
+                            ?>
+                            <div class="mensaje-card <?= $es_interno_msg ? 'interna' : ($is_cliente ? 'cliente' : 'tecnico') ?>">
                                 <div class="mensaje-header">
-                                    <span class="mensaje-autor"><?= ui_e((string)($mensaje['autor'] ?? 'tecnico')) ?></span>
+                                    <span class="mensaje-autor"><?= ui_e($quien_msg) ?><?= $es_interno_msg ? ' <span class="badge-interna">Nota interna</span>' : '' ?></span>
                                     <span class="mensaje-fecha"><?= ui_e((string)($mensaje['fecha'] ?? '')) ?></span>
                                 </div>
                                 <?= ui_render_markdown_block((string)($mensaje['mensaje'] ?? ''), 'recomendacion-text') ?>
@@ -268,13 +306,11 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                 <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
                     <form action="guardar_mensaje.php" method="POST" class="composer">
                         <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                        <input type="hidden" name="idioma_original" value="<?= ui_e((string)($incidencia['idioma'] ?? 'es')) ?>">
                         <textarea name="mensaje" id="mensaje" rows="4" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
                         <div class="composer-row">
-                            <select name="autor" id="autor" required class="composer-autor" title="Autor del mensaje">
-                                <option value="cliente">Cliente</option>
-                                <option value="tecnico">Tecnico</option>
-                            </select>
+                            <label class="composer-check" title="Solo visible para el equipo, nunca para el cliente. No se traduce.">
+                                <input type="checkbox" name="interno" value="1"> Nota interna
+                            </label>
                             <span class="help-line" id="sugerirEstado" hidden>Generando borrador con IA...</span>
                             <span class="composer-spacer"></span>
                             <button type="button" class="card-button secondary-button" id="sugerirRespuesta" data-id="<?= $id_incidencia ?>">Sugerir con IA</button>
@@ -284,6 +320,33 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                 <?php else: ?>
                     <p class="help-line">La incidencia esta cerrada y no se pueden anadir mas mensajes.</p>
                 <?php endif; ?>
+                </div>
+                <div class="incidencia-box compact-box" id="adjuntos">
+                    <h2>Adjuntos</h2>
+                    <?php if (isset($_GET['adjunto'])): ?>
+                        <div class="success-message">Adjunto subido correctamente.</div>
+                    <?php elseif (isset($_GET['adjunto_error'])): ?>
+                        <div class="login-error"><?= ui_e((string)$_GET['adjunto_error']) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($adjuntos)): ?>
+                        <ul class="adjuntos-lista">
+                            <?php foreach ($adjuntos as $adj): ?>
+                                <li>
+                                    <a href="descargar_adjunto.php?id=<?= (int)$adj['id'] ?>"><?= ui_e($adj['nombre_original']) ?></a>
+                                    <span class="adjunto-meta"><?= ui_e(adjuntos_formato_tamano((int)$adj['tamano'])) ?><?= $adj['usuario_nombre'] !== null ? ' - ' . ui_e($adj['usuario_nombre']) : '' ?> - <?= ui_e($adj['fecha']) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <p class="help-line">No hay adjuntos en esta incidencia.</p>
+                    <?php endif; ?>
+                    <form action="subir_adjunto.php" method="POST" enctype="multipart/form-data" class="composer-row adjuntos-form">
+                        <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
+                        <input type="file" name="adjunto" required>
+                        <span class="composer-spacer"></span>
+                        <input type="submit" value="Subir adjunto">
+                    </form>
+                    <p class="help-line">Maximo <?= ui_e(adjuntos_formato_tamano(adjuntos_max_bytes())) ?> por fichero.</p>
                 </div>
             </div>
 
@@ -317,6 +380,18 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                             <span>Idioma</span>
                             <strong><?= ui_e($incidencia['idioma'] ?? 'es') ?></strong>
                         </div>
+                        <?php if (!empty($incidencia['cliente_nombre'])): ?>
+                            <div class="detail-row">
+                                <span>Empresa</span>
+                                <strong><?= ui_e($incidencia['cliente_nombre']) ?></strong>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($incidencia['creador_nombre'])): ?>
+                            <div class="detail-row">
+                                <span>Creada por</span>
+                                <strong><?= ui_e($incidencia['creador_nombre']) ?></strong>
+                            </div>
+                        <?php endif; ?>
                         <div class="detail-row">
                             <span>Departamento</span>
                             <form action="actualizar_tipo_incidencia.php" method="POST" class="detail-row-form">

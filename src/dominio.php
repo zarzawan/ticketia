@@ -139,3 +139,41 @@ function dominio_order_by(string $orden): string {
             return 'id DESC';
     }
 }
+
+/**
+ * Cambia el estado de una incidencia dejando rastro en cambios_estado y
+ * manteniendo fecha_cierre. Devuelve false si la incidencia no existe.
+ */
+function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_estado): bool {
+    if (!in_array($nuevo_estado, dominio_estados(), true)) {
+        return false;
+    }
+
+    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
+    $stmt->execute([':id' => $id_incidencia]);
+    $actual = $stmt->fetchColumn();
+    if ($actual === false) {
+        return false;
+    }
+    if ($actual === $nuevo_estado) {
+        return true;
+    }
+
+    $sql = "UPDATE incidencias SET estado = :estado, fecha_cierre = " .
+        ($nuevo_estado === 'cerrada' ? 'NOW()' : 'NULL') .
+        " WHERE id = :id";
+    $pdo->prepare($sql)->execute([':estado' => $nuevo_estado, ':id' => $id_incidencia]);
+
+    $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
+    $pdo->prepare(
+        "INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
+         VALUES (:id, :usuario, :anterior, :nuevo)"
+    )->execute([
+        ':id' => $id_incidencia,
+        ':usuario' => $usuario['id'] ?? null,
+        ':anterior' => $actual,
+        ':nuevo' => $nuevo_estado,
+    ]);
+
+    return true;
+}

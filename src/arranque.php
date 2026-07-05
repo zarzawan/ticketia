@@ -19,6 +19,7 @@ require __DIR__ . '/ui.php';
 require __DIR__ . '/structured_output.php';
 require __DIR__ . '/llm.php';
 require __DIR__ . '/clasificacion.php';
+require __DIR__ . '/adjuntos.php';
 
 // ---------------------------------------------------------------------------
 // Guard global: toda pagina de public/ exige sesion salvo las publicas;
@@ -39,7 +40,7 @@ if (PHP_SAPI !== 'cli') {
             csrf_verificar();
         }
 
-        $paginas_admin = ['usuarios.php', 'cambiar_proveedor.php', 'reprocesar_incidencias.php', 'ver_logs_llm.php'];
+        $paginas_admin = ['admin_usuarios.php', 'admin_clientes.php', 'admin_auditoria.php', 'admin_ajustes.php', 'cambiar_proveedor.php', 'reprocesar_incidencias.php', 'ver_logs_llm.php'];
         if (in_array($pagina_actual, $paginas_admin, true)) {
             auth_requerir_rol('admin');
         }

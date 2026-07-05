@@ -136,7 +136,7 @@ function ui_menu_usuario(): string {
     $iniciales = ui_e(ui_iniciales((string)$usuario['nombre']));
     $nombre = ui_e((string)$usuario['nombre']);
     $rol = ui_e(ucfirst((string)$usuario['rol']));
-    $admin = auth_es('admin') ? "<a href='usuarios.php' title='Gestion de usuarios'>Usuarios</a>" : '';
+    $admin = auth_es('admin') ? "<a href='admin_usuarios.php' title='Panel de administracion'>Admin</a>" : '';
 
     return "
         <span class='usuario-chip' title='{$nombre}'>
@@ -177,4 +177,68 @@ function ui_render_timeline_item(array $event): string {
         </article>
     ";
 }
-?>
+
+// ---------------------------------------------------------------------------
+// Layout compartido del panel de administracion
+// ---------------------------------------------------------------------------
+
+function ui_admin_nav(string $activa): string {
+    $tabs = [
+        'admin_usuarios.php' => 'Usuarios',
+        'admin_clientes.php' => 'Empresas',
+        'admin_auditoria.php' => 'Auditoria',
+        'admin_ajustes.php' => 'Ajustes',
+        'ver_logs_llm.php' => 'Actividad IA',
+    ];
+
+    $html = "<div class='departamentos-pills admin-nav'>";
+    $html .= "<a class='quick-pill' href='index.php'>&lsaquo; Panel</a>";
+    foreach ($tabs as $url => $etiqueta) {
+        $clase = $url === $activa ? 'quick-pill active' : 'quick-pill';
+        $html .= "<a class='{$clase}' href='{$url}'>{$etiqueta}</a>";
+    }
+    return $html . "</div>";
+}
+
+/** Cabecera completa de una pagina de administracion (hasta el nav incluido). */
+function ui_admin_cabecera(string $titulo, string $subtitulo, string $activa): void {
+    $t = ui_e($titulo);
+    $s = ui_e($subtitulo);
+    echo "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n";
+    echo "    <meta charset=\"UTF-8\">\n";
+    echo "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+    echo "    <title>TicketIA — {$t}</title>\n";
+    echo "    <script>document.documentElement.setAttribute(\"data-theme\", localStorage.getItem(\"incidencias_theme\") || \"light\");</script>\n";
+    echo "    <link rel=\"stylesheet\" href=\"estilos.css\">\n";
+    echo "</head>\n<body>\n<div class=\"container\">\n<div class=\"page-shell\">\n";
+    echo "<header class=\"page-header\">\n<div>\n<h1>{$t}</h1>\n<p class=\"subtitulo\">{$s}</p>\n</div>\n";
+    echo "<div class=\"usuario-zona\">" . ui_menu_usuario() . "<button id=\"themeToggle\" class=\"filter-button secondary\" type=\"button\">Cambiar tema</button></div>\n";
+    echo "</header>\n";
+    echo ui_admin_nav($activa);
+}
+
+/** Pie comun de una pagina de administracion (cierra el layout y aplica el tema). */
+function ui_admin_pie(): void {
+    echo <<<'HTML'
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const themeToggle = document.getElementById('themeToggle');
+    const applyTheme = (theme) => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('incidencias_theme', theme);
+    };
+    applyTheme(localStorage.getItem('incidencias_theme') || 'light');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+    }
+});
+</script>
+</body>
+</html>
+HTML;
+}

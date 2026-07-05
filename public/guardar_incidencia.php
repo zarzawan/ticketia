@@ -17,10 +17,13 @@ if ($titulo === '' || $descripcion === '') {
 // --- Fase 1: insertar la incidencia inmediatamente con valores seguros ---
 // El usuario no espera al LLM. Si la clasificacion falla o tarda, el ticket
 // ya existe con estos valores y puede corregirse despues (reclasificar/reprocesar).
-$sql = "INSERT INTO incidencias (titulo, descripcion, estado, fecha_creacion, urgencia, recomendacion, tipo, resumen, idioma)
-        VALUES (:titulo, :descripcion, 'abierta', NOW(), 'leve', :recomendacion, NULL, :resumen, 'es')";
+$usuario_actual = auth_usuario();
+$sql = "INSERT INTO incidencias (cliente_id, creado_por, titulo, descripcion, estado, fecha_creacion, urgencia, recomendacion, tipo, resumen, idioma)
+        VALUES (:cliente_id, :creado_por, :titulo, :descripcion, 'abierta', NOW(), 'leve', :recomendacion, NULL, :resumen, 'es')";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([
+    ':cliente_id' => $usuario_actual['cliente_id'] ?? null,
+    ':creado_por' => $usuario_actual['id'] ?? null,
     ':titulo' => $titulo,
     ':descripcion' => $descripcion,
     ':recomendacion' => normalizar_recomendacion_markdown(CLASIFICACION_RECOMENDACION_DEFECTO),

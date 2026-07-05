@@ -1,0 +1,157 @@
+[
+  {
+    "n": 3,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "El servicio de correo transaccional está completamente caído desde esta mañana. No podemos enviar ni recibir notificaciones críticas a clientes."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Hemos identificado el fallo inicial en el middleware SMTP. Estamos revisando los logs para determinar la causa raíz del colapso."
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "¿Podrían darnos una estimación de cuándo se restablecerá este servicio vital? Esto está afectando las ventas."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "Revisión del cluster de envío. Se detecta un cuello de botella en la gestión de sesiones (session handling). Escalamos al equipo de infraestructura."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Se ha aplicado un parche temporal y se está monitoreando el tráfico para asegurar la estabilidad completa del servicio."
+      }
+    ]
+  },
+  {
+    "n": 14,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "We are receiving an error stating that the S3 bucket quota has been exceeded. We need immediate assistance to resolve this limit."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Understood. The storage limits for your AWS region have been reached. Can you confirm which specific buckets are affected?"
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "All our primary data buckets seem to be impacted. We need either a quota increase or assistance with archiving old data."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "Verificando la posibilidad de aumentar el límite (Service Limit Increase request). Paralelamente, revisaremos los patrones de acceso para optimizar el almacenamiento existente."
+      }
+    ]
+  },
+  {
+    "n": 15,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "Je n'arrive pas à accéder aux sauvegardes critiques. Le système indique une erreur de connexion répétée depuis ce matin."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Nous avons localisé le problème sur le serveur de stockage des backups. Il semble y avoir un problème d'authentification au niveau du réseau."
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "Ceci est très urgent car nous dépendons de ces sauvegardes pour la continuité opérationnelle. Pouvez-vous agir rapidement?"
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "Se está verificando la configuración de las credenciales de acceso (credentials) entre el servicio y el almacenamiento; posible expiración del token."
+      }
+    ]
+  },
+  {
+    "n": 2,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "El panel de control CMS se siente extremadamente lento. Cada acción que intento realizar tarda varios segundos en procesarse."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Estamos analizando el rendimiento del backend y la base de datos asociada al CMS para identificar las causas de esta latencia."
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "¿Hay alguna actualización programada que pueda estar causando este bajo rendimiento general del sistema?"
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "Se detecta un alto consumo de CPU en el servidor web debido a consultas no optimizadas (N+1 queries). Se está implementando una caché temporal."
+      }
+    ]
+  },
+  {
+    "n": 9,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "Los procesos de restauración de copias de seguridad nocturnas fallaron repetidamente. No tenemos un punto de recuperación reciente."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Hemos revisado los logs del agente de backup y detectamos que la conexión al repositorio remoto se ha interrumpido durante las últimas noches."
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "¿Qué necesitamos hacer para garantizar que el proceso de restauración funcione correctamente esta noche?"
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "Se está investigando la conectividad entre la red local y el storage remoto. Revisar firewall rules o posibles cambios de ISP."
+      }
+    ]
+  },
+  {
+    "n": 16,
+    "mensajes": [
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "Je ne parviens plus à accéder à notre plateforme CRM. L'application affiche un message d'erreur 'Service Unavailable'."
+      },
+      {
+        "autor": "tecnico",
+        "interno": 0,
+        "mensaje": "Nous vérifions l'état des serveurs de la plateforme CRM et les dépendances critiques (API). Veuillez patienter quelques instants."
+      },
+      {
+        "autor": "cliente",
+        "interno": 0,
+        "mensaje": "Ceci est critique pour le suivi client. Quand pouvons-nous espérer une résolution complète du problème?"
+      },
+      {
+        "autor": "tecnico",
+        "interno": 1,
+        "mensaje": "El servicio está experimentando saturación de recursos en el cluster principal (load balancer). Se inicia un reinicio controlado para mitigar la carga."
+      }
+    ]
+  }
+]

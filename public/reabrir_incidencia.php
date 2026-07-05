@@ -22,10 +22,7 @@ $stmt->execute([
     ':motivo' => $motivo
 ]);
 
-// Cambiar estado a 'en_curso' y quitar fecha de cierre
-$sql2 = "UPDATE incidencias SET estado = 'en_curso', fecha_cierre = NULL WHERE id = :id";
-$stmt2 = $pdo->prepare($sql2);
-$stmt2->execute([':id' => $id_incidencia]);
+incidencia_cambiar_estado($pdo, $id_incidencia, 'en_curso');
 auditar($pdo, 'reabrir_incidencia', "incidencia #$id_incidencia");
 
 header("Location: ver_incidencia.php?id=" . $id_incidencia);

@@ -20,15 +20,12 @@ if (!$id_incidencia || !in_array($nuevo_estado, $estados_validos, true)) {
     exit;
 }
 
-$sql = "UPDATE incidencias SET estado = :estado, fecha_cierre = " .
-    ($nuevo_estado === 'cerrada' ? 'NOW()' : 'NULL') .
-    " WHERE id = :id";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute([
-    ':estado' => $nuevo_estado,
-    ':id' => $id_incidencia
-]);
+if (!incidencia_cambiar_estado($pdo, $id_incidencia, $nuevo_estado)) {
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'error' => 'Incidencia no encontrada']);
+    exit;
+}
+auditar($pdo, 'cambiar_estado', "incidencia #$id_incidencia -> $nuevo_estado");
 
 echo json_encode(['ok' => true]);
 exit;

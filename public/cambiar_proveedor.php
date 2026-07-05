@@ -22,5 +22,6 @@ $stmt = $pdo->prepare(
 $stmt->execute([':valor' => $proveedor]);
 auditar($pdo, 'cambiar_proveedor_ia', $proveedor);
 
-header('Location: index.php?proveedor_ok=1');
+$volver = (string)($_POST['volver'] ?? '');
+header('Location: ' . ($volver === 'admin_ajustes.php' ? 'admin_ajustes.php?proveedor_ok=1' : 'index.php?proveedor_ok=1'));
 exit;
