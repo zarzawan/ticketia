@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!in_array($rol, ['admin', 'operador', 'comercial', 'cliente'], true)) {
             $error = 'Rol no valido.';
         } elseif ($rol !== 'cliente' && $cliente_id !== null) {
-            $cliente_id = null; // la empresa solo aplica al rol cliente
+            $error = 'La empresa solo puede asignarse a usuarios con rol cliente. Cambia el rol a "Cliente" o deja la empresa en blanco.';
         }
 
         if ($error === '' && $accion === 'crear') {
@@ -238,7 +238,7 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
             </select>
         </div>
         <div class="filter-field">
-            <label class="filter-label" for="cliente_id">Empresa (rol cliente)</label>
+            <label class="filter-label" for="cliente_id">Empresa (solo rol cliente)</label>
             <select name="cliente_id" id="cliente_id">
                 <option value="">Sin empresa</option>
                 <?php foreach ($clientes as $c): ?>
@@ -246,6 +246,19 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
                 <?php endforeach; ?>
             </select>
         </div>
+        <script>
+            (function () {
+                const rol = document.getElementById('rol');
+                const empresa = document.getElementById('cliente_id');
+                function ajustarEmpresa() {
+                    const esCliente = rol.value === 'cliente';
+                    empresa.disabled = !esCliente;
+                    if (!esCliente) empresa.value = '';
+                }
+                rol.addEventListener('change', ajustarEmpresa);
+                ajustarEmpresa();
+            })();
+        </script>
         <?php if ($editando): ?>
             <div class="filter-field">
                 <label class="filter-label">Estado</label>
