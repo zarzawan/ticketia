@@ -1,9 +1,9 @@
 <?php
 require_once __DIR__ . '/../src/arranque.php';
 
-// Si ya hay sesion, ir al panel.
+// Si ya hay sesion, ir al panel (o al portal si es un cliente).
 if (auth_usuario() !== null) {
-    header('Location: index.php');
+    header('Location: ' . (auth_es('cliente') ? 'portal.php' : 'index.php'));
     exit;
 }
 
@@ -18,10 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $resultado = auth_login($pdo, $email, $password);
         if ($resultado['ok']) {
             $volver = (string)($_POST['volver'] ?? '');
-            // Solo rutas relativas internas, nunca URLs absolutas.
-            $destino = ($volver !== '' && str_starts_with($volver, '/') && !str_starts_with($volver, '//'))
+            $inicio = auth_es('cliente') ? 'portal.php' : 'index.php';
+            // Solo rutas relativas internas, nunca URLs absolutas. Los clientes
+            // van siempre a su portal (el guard les impide el panel interno).
+            $destino = (!auth_es('cliente') && $volver !== '' && str_starts_with($volver, '/') && !str_starts_with($volver, '//'))
                 ? $volver
-                : 'index.php';
+                : $inicio;
             header('Location: ' . $destino);
             exit;
         }

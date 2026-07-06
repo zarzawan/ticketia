@@ -20,6 +20,7 @@ require __DIR__ . '/structured_output.php';
 require __DIR__ . '/llm.php';
 require __DIR__ . '/clasificacion.php';
 require __DIR__ . '/adjuntos.php';
+require __DIR__ . '/correo.php';
 
 // ---------------------------------------------------------------------------
 // Guard global: toda pagina de public/ exige sesion salvo las publicas;
@@ -45,11 +46,19 @@ if (PHP_SAPI !== 'cli') {
             auth_requerir_rol('admin');
         }
 
-        // El portal de cliente llega en una fase posterior: de momento el rol
-        // cliente no tiene acceso al panel interno.
-        if (auth_es('cliente')) {
-            http_response_code(403);
-            die('El portal de cliente estara disponible proximamente.');
+        // El rol cliente solo accede a su portal y a los endpoints que este
+        // usa; cualquier otra pagina lo devuelve al portal. La comprobacion
+        // de propiedad del ticket la hace cada endpoint.
+        $paginas_cliente = ['portal.php', 'portal_ver.php', 'guardar_incidencia.php', 'guardar_mensaje.php', 'subir_adjunto.php', 'descargar_adjunto.php', 'logout.php'];
+        if (auth_es('cliente') && !in_array($pagina_actual, $paginas_cliente, true)) {
+            header('Location: portal.php');
+            exit;
+        }
+
+        // Y a la inversa: el portal es solo para el rol cliente.
+        if (in_array($pagina_actual, ['portal.php', 'portal_ver.php'], true) && !auth_es('cliente')) {
+            header('Location: index.php');
+            exit;
         }
     } elseif (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         csrf_verificar();

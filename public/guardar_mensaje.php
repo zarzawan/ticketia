@@ -10,9 +10,26 @@ $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
 $mensaje = trim((string)($_POST['mensaje'] ?? ''));
 $interno = isset($_POST['interno']) && $_POST['interno'] === '1' && !auth_es('cliente');
 
+$es_cliente = auth_es('cliente');
+$pagina_detalle = $es_cliente ? 'portal_ver.php' : 'ver_incidencia.php';
+
 if (!$id_incidencia || $mensaje === '') {
-    header("Location: ver_incidencia.php?id=" . (int)$id_incidencia . "&error=1");
+    header("Location: $pagina_detalle?id=" . (int)$id_incidencia . "&error=1");
     exit;
+}
+
+// Un cliente solo puede escribir en tickets de su ambito y nunca cerrados.
+if ($es_cliente) {
+    if (!incidencia_visible_para_cliente($pdo, (int)$id_incidencia, auth_usuario())) {
+        header('Location: portal.php');
+        exit;
+    }
+    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
+    $stmt->execute([':id' => $id_incidencia]);
+    if ($stmt->fetchColumn() === 'cerrada') {
+        header("Location: portal_ver.php?id=" . (int)$id_incidencia);
+        exit;
+    }
 }
 
 // El idioma original se lee de la incidencia, no del formulario.
@@ -54,5 +71,10 @@ $stmt->execute([
 ]);
 auditar($pdo, $interno ? 'nota_interna' : 'nuevo_mensaje', "incidencia #$id_incidencia");
 
-header("Location: ver_incidencia.php?id=$id_incidencia&ok=1");
+// Notificar por email (nunca las notas internas).
+if (!$interno) {
+    correo_notificar_mensaje($pdo, (int)$id_incidencia, $autor === 'cliente');
+}
+
+header("Location: $pagina_detalle?id=$id_incidencia&ok=1");
 exit;

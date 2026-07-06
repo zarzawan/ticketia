@@ -175,5 +175,27 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
         ':nuevo' => $nuevo_estado,
     ]);
 
+    if (function_exists('correo_notificar_estado')) {
+        correo_notificar_estado($pdo, $id_incidencia, (string)$actual, $nuevo_estado);
+    }
+
     return true;
+}
+
+/**
+ * true si un usuario con rol cliente puede ver la incidencia: pertenece a su
+ * empresa o, si no tiene empresa asignada, la creo el mismo.
+ */
+function incidencia_visible_para_cliente(PDO $pdo, int $id_incidencia, array $usuario): bool {
+    $stmt = $pdo->prepare("SELECT cliente_id, creado_por FROM incidencias WHERE id = :id");
+    $stmt->execute([':id' => $id_incidencia]);
+    $fila = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$fila) {
+        return false;
+    }
+    $empresa = $usuario['cliente_id'] ?? null;
+    if ($empresa !== null) {
+        return (int)$fila['cliente_id'] === (int)$empresa;
+    }
+    return $fila['creado_por'] !== null && (int)$fila['creado_por'] === (int)($usuario['id'] ?? 0);
 }

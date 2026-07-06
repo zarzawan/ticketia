@@ -21,10 +21,9 @@ if (!$adjunto) {
     die('Adjunto no encontrado.');
 }
 
-// Un usuario con rol cliente solo puede descargar adjuntos de su empresa
-// (preparado para el portal de cliente).
-$usuario = auth_usuario();
-if (auth_es('cliente') && (int)$adjunto['incidencia_cliente'] !== (int)($usuario['cliente_id'] ?? 0)) {
+// Un usuario con rol cliente solo puede descargar adjuntos de su ambito
+// (los tickets de su empresa o, sin empresa, los creados por el).
+if (auth_es('cliente') && !incidencia_visible_para_cliente($pdo, (int)$adjunto['id_incidencia'], auth_usuario())) {
     http_response_code(403);
     die('No tienes permisos para descargar este adjunto.');
 }
