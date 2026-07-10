@@ -56,7 +56,7 @@ clicables, cola personal del operador, asignación de técnicos y modo oscuro.
 
 ## Requisitos
 
-- PHP >= 8.1 con `pdo_mysql`, `curl`, `mbstring`
+- PHP >= 8.2 con `pdo_mysql`, `curl`, `mbstring`
 - MySQL 8 / MariaDB 10.6+
 - Composer
 - Opcional: un servidor de IA local (LM Studio u Ollama) o claves de OpenAI/xAI
@@ -131,7 +131,7 @@ Configura `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` y `APP_URL` en `.env` (ver
 vendor/bin/phpunit
 ```
 
-La CI de GitHub Actions ejecuta lint, tests (PHP 8.1–8.3), escaneo de secretos y el build
+La CI de GitHub Actions ejecuta lint, tests (PHP 8.2–8.3), escaneo de secretos y el build
 de la imagen Docker en cada push y pull request.
 
 ## Hoja de ruta hacia v1.0

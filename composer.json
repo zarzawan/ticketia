@@ -6,7 +6,7 @@
     "homepage": "https://github.com/ticketia/ticketia",
     "keywords": ["helpdesk", "tickets", "ia", "llm", "self-hosted", "soporte"],
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.2",
         "ext-curl": "*",
         "ext-mbstring": "*",
         "ext-pdo_mysql": "*",

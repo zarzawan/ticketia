@@ -5,7 +5,9 @@
 FROM composer:2 AS dependencias
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --no-scripts
+# La imagen de composer no trae pdo_mysql; la extension existe en el runtime.
+RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --no-scripts \
+    --ignore-platform-req=ext-pdo_mysql
 
 # --- Etapa 2: runtime ---
 FROM php:8.2-fpm-alpine
