@@ -3,7 +3,7 @@
     "description": "Helpdesk open source con IA: triage automatico, soporte multilingue y analisis del backlog. Self-hosted, con soporte de IA 100% local.",
     "type": "project",
     "license": "AGPL-3.0-or-later",
-    "homepage": "https://github.com/ticketia/ticketia",
+    "homepage": "https://github.com/zarzawan/ticketia",
     "keywords": ["helpdesk", "tickets", "ia", "llm", "self-hosted", "soporte"],
     "require": {
         "php": ">=8.2",

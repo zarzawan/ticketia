@@ -64,7 +64,7 @@ clicables, cola personal del operador, asignación de técnicos y modo oscuro.
 ## Instalación con Docker (recomendada)
 
 ```bash
-git clone https://github.com/TU_USUARIO/ticketia.git
+git clone https://github.com/zarzawan/ticketia.git
 cd ticketia
 cp .env.example .env          # ajusta la IA si quieres usarla
 docker compose up -d
@@ -84,7 +84,7 @@ comercial, cliente).
 ## Instalación manual (XAMPP, hosting compartido, VPS…)
 
 ```bash
-git clone https://github.com/TU_USUARIO/ticketia.git
+git clone https://github.com/zarzawan/ticketia.git
 cd ticketia
 composer install
 cp .env.example .env          # configura tu base de datos y la IA
@@ -144,7 +144,7 @@ de la imagen Docker en cada push y pull request.
 - [x] Panel de administración
 - [x] Cola de trabajos IA y control de coste
 - [x] Tests + CI
-- [ ] Release v1.0 y repositorio público
+- [x] Release v1.0 y repositorio público
 
 Post-v1: email-to-ticket, interfaz en inglés (i18n), búsqueda semántica con embeddings,
 SLA con alertas, API REST, 2FA TOTP y recuperación de contraseña por email.
