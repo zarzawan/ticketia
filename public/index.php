@@ -173,6 +173,7 @@ $sql_kpi = "
         SUM(urgencia = 'critico' AND estado <> 'cerrada') AS criticas_abiertas,
         SUM(estado <> 'cerrada' AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
         SUM(asignado_id IS NULL AND estado <> 'cerrada') AS sin_asignar,
+        SUM(asignado_id = :kpi_yo AND estado <> 'cerrada') AS mios,
         SUM(tipo = 'Comercial') AS comerciales,
         AVG(CASE WHEN fecha_cierre IS NOT NULL THEN TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_cierre) END) AS ttr_horas,
         AVG(CASE WHEN estado <> 'cerrada' THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
@@ -180,7 +181,7 @@ $sql_kpi = "
     FROM incidencias
     WHERE 1=1
 ";
-$params_kpi = [];
+$params_kpi = [':kpi_yo' => (int)(auth_usuario()['id'] ?? 0)];
 appendCommonFilters($sql_kpi, $params_kpi, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
 $stmt_kpi = $pdo->prepare($sql_kpi);
 $stmt_kpi->execute($params_kpi);
@@ -437,6 +438,8 @@ if ($limite === 20) {
                     $url_en_curso = buildQueryUrl(['filtro_estado' => 'en_curso']);
                     $url_criticas_abiertas = buildQueryUrl(['filtro_urgencia' => 'critico', 'filtro_estado' => '']);
                     $url_sin_asignar = buildQueryUrl(['filtro_asignado' => 'sin_asignar']);
+                    $mi_id = (string)(int)(auth_usuario()['id'] ?? 0);
+                    $url_mios = buildQueryUrl(['filtro_asignado' => $mi_id]);
                     $url_48h = buildQueryUrl(['filtro_hasta' => $fecha_48h, 'filtro_estado' => '']);
                     $url_todas = buildQueryUrl([
                         'busqueda' => '', 'filtro_tipo' => '', 'filtro_urgencia' => '', 'filtro_estado' => '',
@@ -462,6 +465,12 @@ if ($limite === 20) {
                             <span class="stat-value"><?= (int)($kpi['sin_asignar'] ?? 0) ?></span>
                             <span class="stat-label">Sin asignar</span>
                         </a>
+                        <?php if (auth_es('admin', 'operador')): // solo roles asignables tienen cola propia ?>
+                        <a class="stat <?= $filtro_asignado === $mi_id ? 'stat-activo' : '' ?>" href="<?= ui_e($url_mios) ?>" title="Filtrar mis incidencias abiertas">
+                            <span class="stat-value"><?= (int)($kpi['mios'] ?? 0) ?></span>
+                            <span class="stat-label">Mis tickets</span>
+                        </a>
+                        <?php endif; ?>
                         <a class="stat <?= $filtro_hasta === $fecha_48h ? 'stat-activo' : '' ?>" href="<?= ui_e($url_48h) ?>" title="Filtrar incidencias creadas hace mas de 48h">
                             <span class="stat-value"><?= (int)($kpi['abiertas_48h'] ?? 0) ?></span>
                             <span class="stat-label">Abiertas +48h</span>

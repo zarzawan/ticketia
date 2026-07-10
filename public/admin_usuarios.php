@@ -77,6 +77,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ':n' => $nombre, ':e' => $email, ':r' => $rol,
                         ':c' => $cliente_id, ':a' => $activo, ':id' => $id,
                     ]);
+                    // Si deja de ser asignable (rol no operativo o cuenta
+                    // desactivada), sus tickets abiertos vuelven a la cola.
+                    if (!in_array($rol, ['admin', 'operador'], true) || !$activo) {
+                        $desasignadas = $pdo->prepare(
+                            "UPDATE incidencias SET asignado_id = NULL WHERE asignado_id = :id AND estado <> 'cerrada'"
+                        );
+                        $desasignadas->execute([':id' => $id]);
+                        if ($desasignadas->rowCount() > 0) {
+                            auditar($pdo, 'desasignar_tickets', "usuario #$id: " . $desasignadas->rowCount() . ' tickets abiertos a la cola');
+                            $aviso = $desasignadas->rowCount() . ' tickets abiertos del usuario han vuelto a la cola de sin asignar. ';
+                        }
+                    }
                     if (strlen($password) >= 10) {
                         $pdo->prepare("UPDATE usuarios SET hash_password = :h WHERE id = :id")
                             ->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $id]);
@@ -85,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     auditar($pdo, 'editar_usuario', "usuario #$id ($email)");
                     if ($error === '') {
-                        $aviso = 'Usuario actualizado.';
+                        $aviso .= 'Usuario actualizado.';
                     }
                 } catch (PDOException $e) {
                     $error = 'Ya existe otro usuario con ese email.';

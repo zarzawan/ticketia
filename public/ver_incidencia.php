@@ -420,6 +420,14 @@ if (isset($_GET['recomendacion']) && !$recomendacion_fallida) {
                                 </select>
                             </form>
                         </div>
+                        <?php $yo_id = (int)(auth_usuario()['id'] ?? 0); ?>
+                        <?php if (auth_es('admin', 'operador') && (int)($incidencia['asignado_id'] ?? 0) !== $yo_id): ?>
+                            <form action="asignar_incidencia.php" method="POST" class="detail-action">
+                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
+                                <input type="hidden" name="asignado" value="<?= $yo_id ?>">
+                                <button type="submit" class="card-button secondary-button">Asignarmela a mi</button>
+                            </form>
+                        <?php endif; ?>
                     </div>
 
                     <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
