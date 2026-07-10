@@ -1,0 +1,21 @@
+name: Propuesta de funcionalidad
+description: Una idea para mejorar TicketIA
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: ¿Qué problema resuelve?
+      description: Describe la necesidad o el caso de uso, no solo la solución.
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Solución propuesta
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas

@@ -27,9 +27,32 @@ automatizar el trabajo repetitivo del soporte:
 - 🔒 **Privacidad**: funciona con IA local (LM Studio, Ollama o cualquier API compatible
   OpenAI). Los proveedores cloud (OpenAI, xAI) son opcionales. Los modelos razonadores
   (DeepSeek-R1, Qwen3, gpt-oss…) están soportados: el razonamiento se filtra automáticamente.
+- 🏢 **Multicliente con portal**: cada empresa ve solo sus tickets; los clientes crean y
+  siguen los suyos desde un portal propio, sin acceso a los datos internos del equipo.
+- 📎 **Adjuntos seguros**: validación por contenido real, almacenados fuera del docroot y
+  descarga siempre autenticada.
+- 🗒️ **Notas internas** en la conversación, visibles solo para el equipo (nunca se traducen
+  ni llegan al cliente).
+- ✉️ **Notificaciones por email** (opcionales, SMTP): ticket nuevo, respuestas y cambios de
+  estado, con enlaces al portal o al panel según el destinatario.
+- ⚙️ **Cola de trabajos IA**: si el proveedor está caído, la clasificación se encola y un
+  worker la reintenta con backoff; incluye límite diario de llamadas de pago y modo
+  solo-local para coste cero garantizado.
+- 🛡️ **Panel de administración**: usuarios y roles, empresas, auditoría completa y ajustes
+  del sistema con prueba de conexión IA en vivo.
 
 Interfaz con panel Kanban (arrastrar y soltar), filtros persistentes, estadísticas
-clicables, asignación de técnicos y modo oscuro.
+clicables, cola personal del operador, asignación de técnicos y modo oscuro.
+
+## Capturas
+
+| Panel del equipo | Detalle de incidencia |
+|---|---|
+| ![Panel Kanban](docs/capturas/panel.png) | ![Detalle](docs/capturas/detalle.png) |
+
+| Portal de cliente | Administración |
+|---|---|
+| ![Portal](docs/capturas/portal.png) | ![Admin](docs/capturas/admin.png) |
 
 ## Requisitos
 
@@ -84,25 +107,52 @@ Todo se configura en `.env` (ver `.env.example`):
 Sin IA configurada, TicketIA funciona como un helpdesk convencional: los tickets se crean
 con valores por defecto y puedes clasificarlos a mano o re-clasificarlos con IA más tarde.
 
+Control de coste: `LLM_SOLO_LOCAL=1` ignora los proveedores de pago aunque haya claves, y
+`LLM_MAX_LLAMADAS_DIA` corta las llamadas de pago al alcanzar el cupo diario.
+
+## Worker de trabajos IA
+
+Las tareas de IA que fallan (proveedor caído, timeout) se encolan y se reintentan con
+backoff. Programa el worker con cron o el Programador de tareas de Windows:
+
+```bash
+php bin/worker.php            # procesa hasta 10 trabajos y termina
+php bin/worker.php --bucle    # en bucle continuo (servicio)
+```
+
+## Notificaciones por email (opcional)
+
+Configura `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` y `APP_URL` en `.env` (ver
+`.env.example`). Sin SMTP configurado no se envía nada y todo funciona igual.
+
+## Tests
+
+```bash
+vendor/bin/phpunit
+```
+
+La CI de GitHub Actions ejecuta lint, tests (PHP 8.1–8.3), escaneo de secretos y el build
+de la imagen Docker en cada push y pull request.
+
 ## Hoja de ruta hacia v1.0
 
 - [x] Núcleo de tickets + IA (POC endurecida)
 - [x] Instalador, migraciones, Docker, datos de demo
 - [x] Autenticación, roles, CSRF y auditoría (2FA y recuperación por email, pendientes)
-- [ ] Multicliente y adjuntos
-- [ ] Portal de cliente con notificaciones email
-- [ ] Panel de administración
-- [ ] Cola de trabajos IA y control de coste
-- [ ] Tests + CI
+- [x] Multicliente y adjuntos
+- [x] Portal de cliente con notificaciones email
+- [x] Panel de administración
+- [x] Cola de trabajos IA y control de coste
+- [x] Tests + CI
+- [ ] Release v1.0 y repositorio público
 
 Post-v1: email-to-ticket, interfaz en inglés (i18n), búsqueda semántica con embeddings,
-SLA con alertas, API REST.
+SLA con alertas, API REST, 2FA TOTP y recuperación de contraseña por email.
 
 ## Contribuir
 
-El proyecto está en fase temprana; issues y pull requests son bienvenidos. Las guías de
-contribución formales (CONTRIBUTING, código de conducta, política de seguridad) llegarán
-antes de la v1.0.
+Issues y pull requests son bienvenidos. Lee [CONTRIBUTING.md](CONTRIBUTING.md), el
+[código de conducta](CODE_OF_CONDUCT.md) y la [política de seguridad](SECURITY.md).
 
 ## Licencia
 

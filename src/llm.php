@@ -18,6 +18,10 @@ function llm_strip_razonamiento(string $texto): string {
     // Pares <think>...</think>
     $texto = preg_replace('/<(think|thinking|reasoning|thought)>[\s\S]*?<\/\1>/iu', '', $texto) ?? $texto;
 
+    // Apertura sin cierre (stream cortado a mitad del razonamiento): nunca
+    // mostrar el pensamiento; mejor vacio que filtrar el razonamiento crudo.
+    $texto = preg_replace('/<(think|thinking|reasoning|thought)>[\s\S]*$/iu', '', $texto) ?? $texto;
+
     // Cierre sin apertura (respuesta parcial): quedarse con lo posterior al ultimo cierre
     if (preg_match('/<\/(think|thinking|reasoning|thought)>/iu', $texto)) {
         $partes = preg_split('/<\/(?:think|thinking|reasoning|thought)>/iu', $texto);
@@ -202,7 +206,9 @@ class LLMFiltroRazonamiento {
             }
             $this->par['buf'] = '';
         } elseif ($this->estado === 'inicio') {
-            $salida = $this->buf;
+            // El stream termino sin salir del estado inicial: limpiar cualquier
+            // razonamiento antes de volcar lo retenido.
+            $salida = llm_strip_razonamiento($this->buf);
         }
         $this->buf = '';
 

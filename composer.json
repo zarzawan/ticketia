@@ -27,5 +27,8 @@
         "migrar": "phinx migrate -e principal",
         "semillas": "phinx seed:run -e principal",
         "worker": "php bin/worker.php"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
     }
 }
