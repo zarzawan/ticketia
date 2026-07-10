@@ -59,6 +59,9 @@ $clasificacion = clasificar_incidencia($titulo, $descripcion);
 if ($clasificacion !== null) {
     clasificacion_aplicar($pdo, $id_incidencia, $clasificacion);
 } else {
-    error_log("Clasificacion IA fallida para incidencia #$id_incidencia; quedan los valores por defecto.");
+    // Proveedor caido o respuesta invalida: a la cola para que el worker
+    // lo reintente con backoff (bin/worker.php).
+    trabajos_encolar($pdo, 'clasificar', ['id_incidencia' => $id_incidencia]);
+    error_log("Clasificacion IA fallida para incidencia #$id_incidencia; encolada para reintento.");
 }
 exit;

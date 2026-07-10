@@ -21,6 +21,7 @@ require __DIR__ . '/llm.php';
 require __DIR__ . '/clasificacion.php';
 require __DIR__ . '/adjuntos.php';
 require __DIR__ . '/correo.php';
+require __DIR__ . '/trabajos.php';
 
 // ---------------------------------------------------------------------------
 // Guard global: toda pagina de public/ exige sesion salvo las publicas;

@@ -26,6 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         auditar($pdo, 'purgar_logs_ia', "$borrados registros");
         $aviso = "Eliminados $borrados registros de actividad IA anteriores a 30 dias.";
     }
+
+    if ($accion === 'procesar_cola') {
+        $resumen = trabajos_procesar_lote($pdo, 10);
+        auditar($pdo, 'procesar_cola_ia', json_encode($resumen));
+        $aviso = "Cola procesada: {$resumen['procesados']} trabajos ({$resumen['completados']} completados, {$resumen['reintentos']} reintentos, {$resumen['fallidos']} fallidos).";
+    }
+
+    if ($accion === 'reintentar_fallidos') {
+        $n = trabajos_reintentar_fallidos($pdo);
+        auditar($pdo, 'reintentar_trabajos_ia', "$n trabajos");
+        $aviso = "$n trabajos fallidos reencolados.";
+    }
 }
 
 // ---------------- Informacion del sistema ----------------
@@ -47,6 +59,12 @@ $contadores = $pdo->query(
 )->fetch(PDO::FETCH_ASSOC);
 
 $extensiones = ['pdo_mysql', 'curl', 'mbstring', 'fileinfo', 'openssl'];
+
+$cola = trabajos_estado($pdo);
+$limite_dia = (int)($_ENV['LLM_MAX_LLAMADAS_DIA'] ?? 0);
+$llamadas_pago_hoy = (int)$pdo->query(
+    "SELECT COUNT(*) FROM llm_logs WHERE proveedor <> 'local' AND DATE(fecha) = CURDATE()"
+)->fetchColumn();
 
 ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del sistema.', 'admin_ajustes.php');
 ?>
@@ -93,6 +111,33 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
             <?php endif; ?>
         <?php endif; ?>
         <p class="help-line">Los endpoints y claves se configuran en el fichero .env; los cambios de proveedor hechos aqui se guardan en la base de datos.</p>
+
+        <h2 style="margin-top:18px;">Cola de trabajos IA</h2>
+        <div class="detail-list">
+            <div class="detail-row"><span>Pendientes</span><strong><?= (int)($cola['pendiente'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>En curso</span><strong><?= (int)($cola['en_curso'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>Completados</span><strong><?= (int)($cola['completado'] ?? 0) ?></strong></div>
+            <div class="detail-row"><span>Fallidos</span><strong><?= (int)($cola['fallido'] ?? 0) ?></strong></div>
+            <div class="detail-row">
+                <span>Limite diario IA de pago</span>
+                <strong><?= $limite_dia > 0 ? "$llamadas_pago_hoy / $limite_dia hoy" : 'Sin limite' ?><?= !empty($llm_solo_local) ? ' · solo-local activo' : '' ?></strong>
+            </div>
+        </div>
+        <div class="page-tools" style="margin-top:10px;">
+            <form method="POST">
+                <?= csrf_campo() ?>
+                <input type="hidden" name="accion" value="procesar_cola">
+                <button type="submit" class="card-button secondary-button">Procesar cola ahora (10)</button>
+            </form>
+            <?php if ((int)($cola['fallido'] ?? 0) > 0): ?>
+                <form method="POST">
+                    <?= csrf_campo() ?>
+                    <input type="hidden" name="accion" value="reintentar_fallidos">
+                    <button type="submit" class="card-button secondary-button">Reencolar fallidos</button>
+                </form>
+            <?php endif; ?>
+        </div>
+        <p class="help-line">Para procesado automatico programa <code>php bin/worker.php</code> (cron o Programador de tareas), o dejalo en bucle con <code>--bucle</code>.</p>
     </div>
 
     <div class="incidencia-box compact-box">

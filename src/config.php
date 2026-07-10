@@ -53,7 +53,11 @@ if ($llm_local_endpoint !== '') {
     ];
 }
 
-if (!empty($_ENV['OPENAI_API_KEY'])) {
+// Modo solo-local: con LLM_SOLO_LOCAL=1 se ignoran los proveedores de pago
+// aunque haya claves configuradas (garantia de coste cero y privacidad total).
+$llm_solo_local = ($_ENV['LLM_SOLO_LOCAL'] ?? '') === '1';
+
+if (!$llm_solo_local && !empty($_ENV['OPENAI_API_KEY'])) {
     $llm_config['openai'] = [
         'label' => 'OpenAI',
         'endpoint' => 'https://api.openai.com/v1/chat/completions',
@@ -64,7 +68,7 @@ if (!empty($_ENV['OPENAI_API_KEY'])) {
     ];
 }
 
-if (!empty($_ENV['XAI_API_KEY'])) {
+if (!$llm_solo_local && !empty($_ENV['XAI_API_KEY'])) {
     $llm_config['xai'] = [
         'label' => 'xAI',
         'endpoint' => 'https://api.x.ai/v1/chat/completions',

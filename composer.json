@@ -25,6 +25,7 @@
     "scripts": {
         "instalar": "php bin/instalar.php",
         "migrar": "phinx migrate -e principal",
-        "semillas": "phinx seed:run -e principal"
+        "semillas": "phinx seed:run -e principal",
+        "worker": "php bin/worker.php"
     }
 }

@@ -296,9 +296,42 @@ class LLMHttpClient {
         return $headers;
     }
 
+    /**
+     * Limite de coste: LLM_MAX_LLAMADAS_DIA (0 o vacio = sin limite) corta las
+     * llamadas a proveedores de pago cuando se alcanza el cupo diario, contado
+     * sobre llm_logs. La IA local nunca se limita.
+     */
+    private function limiteDiarioAlcanzado(): bool {
+        if (($this->provider['id'] ?? '') === 'local') {
+            return false;
+        }
+        $limite = (int)($_ENV['LLM_MAX_LLAMADAS_DIA'] ?? 0);
+        if ($limite <= 0) {
+            return false;
+        }
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!$pdo instanceof PDO) {
+            return false;
+        }
+        try {
+            $hoy = (int)$pdo->query(
+                "SELECT COUNT(*) FROM llm_logs WHERE proveedor <> 'local' AND DATE(fecha) = CURDATE()"
+            )->fetchColumn();
+            return $hoy >= $limite;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     /** Llamada sin streaming. Devuelve el texto de la respuesta o null si falla. */
     public function getResponse(string $contexto, string $pregunta): ?string {
         $inicio = microtime(true);
+
+        if ($this->limiteDiarioAlcanzado()) {
+            error_log('TicketIA: limite diario de llamadas IA de pago alcanzado (LLM_MAX_LLAMADAS_DIA).');
+            $this->log($inicio, null, false, null, null, 'Limite diario alcanzado');
+            return null;
+        }
 
         $ch = curl_init($this->provider['endpoint']);
         curl_setopt_array($ch, [
@@ -366,6 +399,15 @@ class LLMHttpClient {
 
         $inicio = microtime(true);
         $label = $this->provider['label'];
+
+        if ($this->limiteDiarioAlcanzado()) {
+            $this->log($inicio, null, false, null, null, 'Limite diario alcanzado');
+            echo "data: " . json_encode(['error' => 'Limite diario de llamadas IA de pago alcanzado. Usa la IA local o espera a manana.']) . "\n\n";
+            echo "data: [DONE]\n\n";
+            flush();
+            return;
+        }
+
         $sseBuffer = '';
         $filtroRazonamiento = new LLMFiltroRazonamiento();
 
