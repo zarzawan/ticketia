@@ -146,7 +146,7 @@ de la imagen Docker en cada push y pull request.
 - [x] Tests + CI
 - [x] Release v1.0 y repositorio público
 
-Post-v1: email-to-ticket, interfaz en inglés (i18n), búsqueda semántica con embeddings,
+Post-v1: email-to-ticket, búsqueda semántica con embeddings,
 SLA con alertas, API REST, 2FA TOTP y recuperación de contraseña por email.
 
 ## Contribuir

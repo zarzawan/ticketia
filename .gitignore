@@ -8,3 +8,4 @@ desktop.ini
 .DS_Store
 /almacen/adjuntos/*
 !/almacen/adjuntos/.gitkeep
+/AGENTS.local.md
