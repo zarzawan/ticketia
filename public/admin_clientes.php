@@ -12,19 +12,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
         $nombre = trim((string)($_POST['nombre'] ?? ''));
         $email_contacto = trim((string)($_POST['email_contacto'] ?? ''));
+        $nivel_servicio = (string)($_POST['nivel_servicio'] ?? 'estandar');
 
         if ($nombre === '') {
             $error = 'El nombre de la empresa es obligatorio.';
         } elseif ($email_contacto !== '' && !filter_var($email_contacto, FILTER_VALIDATE_EMAIL)) {
             $error = 'El email de contacto no es valido.';
+        } elseif (!isset(dominio_niveles_servicio()[$nivel_servicio])) {
+            $error = 'El nivel de servicio no es valido.';
         } elseif ($accion === 'crear') {
-            $pdo->prepare("INSERT INTO clientes (nombre, email_contacto) VALUES (:n, :e)")
-                ->execute([':n' => $nombre, ':e' => $email_contacto !== '' ? $email_contacto : null]);
+            $pdo->prepare("INSERT INTO clientes (nombre, email_contacto, nivel_servicio) VALUES (:n, :e, :nivel)")
+                ->execute([':n' => $nombre, ':e' => $email_contacto !== '' ? $email_contacto : null, ':nivel' => $nivel_servicio]);
             auditar($pdo, 'crear_cliente', $nombre);
             $aviso = "Empresa $nombre creada.";
         } elseif ($id > 0) {
-            $pdo->prepare("UPDATE clientes SET nombre = :n, email_contacto = :e WHERE id = :id")
-                ->execute([':n' => $nombre, ':e' => $email_contacto !== '' ? $email_contacto : null, ':id' => $id]);
+            $pdo->prepare("UPDATE clientes SET nombre = :n, email_contacto = :e, nivel_servicio = :nivel WHERE id = :id")
+                ->execute([':n' => $nombre, ':e' => $email_contacto !== '' ? $email_contacto : null, ':nivel' => $nivel_servicio, ':id' => $id]);
             auditar($pdo, 'editar_cliente', "empresa #$id ($nombre)");
             $aviso = 'Empresa actualizada.';
         }
@@ -84,6 +87,14 @@ ui_admin_cabecera('Empresas', 'Clientes a los que pertenecen los usuarios del po
             <label class="filter-label" for="email_contacto">Email de contacto (opcional)</label>
             <input type="email" id="email_contacto" name="email_contacto" value="<?= ui_e($editando['email_contacto'] ?? '') ?>">
         </div>
+        <div class="filter-field">
+            <label class="filter-label" for="nivel_servicio">Nivel de servicio</label>
+            <select id="nivel_servicio" name="nivel_servicio">
+                <?php foreach (dominio_niveles_servicio() as $clave => $etiqueta): ?>
+                    <option value="<?= ui_e($clave) ?>" <?= ($editando['nivel_servicio'] ?? 'estandar') === $clave ? 'selected' : '' ?>><?= ui_e($etiqueta) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div class="filter-actions-inline">
             <button type="submit" class="filter-button"><?= $editando ? 'Guardar' : 'Crear' ?></button>
         </div>
@@ -97,13 +108,14 @@ ui_admin_cabecera('Empresas', 'Clientes a los que pertenecen los usuarios del po
     <?php else: ?>
         <table class="logs-table">
             <thead>
-                <tr><th>Nombre</th><th>Contacto</th><th>Usuarios</th><th>Tickets</th><th>Abiertos</th><th>Estado</th><th>Alta</th><th>Acciones</th></tr>
+                <tr><th>Nombre</th><th>Contacto</th><th>Nivel SLA</th><th>Usuarios</th><th>Tickets</th><th>Abiertos</th><th>Estado</th><th>Alta</th><th>Acciones</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($clientes as $c): ?>
                     <tr class="<?= (int)$c['activo'] === 0 ? 'fila-apagada' : '' ?>">
                         <td><?= ui_e($c['nombre']) ?></td>
                         <td><?= ui_e($c['email_contacto'] ?? '-') ?></td>
+                        <td><?= ui_e(dominio_niveles_servicio()[$c['nivel_servicio'] ?? 'estandar'] ?? 'Estandar') ?></td>
                         <td><?= (int)$c['usuarios'] ?></td>
                         <td><?= (int)$c['tickets'] ?></td>
                         <td><?= (int)$c['tickets_abiertos'] ?></td>

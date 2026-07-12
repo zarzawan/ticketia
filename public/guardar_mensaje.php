@@ -33,7 +33,7 @@ if ($es_cliente) {
 }
 
 // El idioma original se lee de la incidencia, no del formulario.
-$stmt = $pdo->prepare("SELECT idioma FROM incidencias WHERE id = :id");
+$stmt = $pdo->prepare("SELECT idioma, estado FROM incidencias WHERE id = :id");
 $stmt->execute([':id' => $id_incidencia]);
 $incidencia = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$incidencia) {
@@ -70,6 +70,16 @@ $stmt->execute([
     ':interno' => $interno ? 1 : 0
 ]);
 auditar($pdo, $interno ? 'nota_interna' : 'nuevo_mensaje', "incidencia #$id_incidencia");
+
+// La primera respuesta publica del equipo mueve automaticamente el ticket a
+// trabajo activo. Las notas internas no alteran el flujo.
+if (!$interno && $autor === 'tecnico' && ($incidencia['estado'] ?? '') === 'abierta') {
+    $pdo->prepare("UPDATE incidencias SET estado = 'en_curso', fecha_cierre = NULL WHERE id = :id")
+        ->execute([':id' => $id_incidencia]);
+    $pdo->prepare("INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo) VALUES (:id, :usuario, 'abierta', 'en_curso')")
+        ->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null]);
+    auditar($pdo, 'inicio_automatico', "incidencia #$id_incidencia por respuesta del equipo");
+}
 
 // Notificar por email (nunca las notas internas).
 if (!$interno) {

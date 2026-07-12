@@ -22,6 +22,15 @@ automatizar el trabajo repetitivo del soporte:
   especializada en incidencias de seguridad.
 - 🔍 **Detección de duplicados** al crear un ticket (búsqueda FULLTEXT).
 - ✍️ **Borradores de respuesta** sugeridos por IA en la conversación.
+- **Copiloto operativo por ticket**: sintetiza el hilo, propone la siguiente accion,
+  permite traducir el contenido e integra recomendaciones de catalogo en incidencias comerciales.
+- **SLA y colas inteligentes**: objetivos configurables por nivel de cliente, tipo de
+  incidencia y urgencia, avisos de riesgo y bandejas para
+  respuesta pendiente, espera del cliente y tickets sin asignar.
+- **Bandeja operativa renovada**: navegación lateral sin accesos duplicados, alta rápida
+  de incidencias, resumen y analítica siempre visibles y listado ordenable en ambos sentidos.
+- **Operaciones en lote**: seleccion multiple en Kanban y lista para cambiar estado o
+  responsable sin abrir cada incidencia.
 - 💼 **Recomendación comercial**: cruza tickets comerciales con tu catálogo de productos.
 - 📈 **Observabilidad de IA**: latencia, tokens y errores por proveedor.
 - 🔒 **Privacidad**: funciona con IA local (LM Studio, Ollama o cualquier API compatible

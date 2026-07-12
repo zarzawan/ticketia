@@ -23,6 +23,10 @@ require __DIR__ . '/adjuntos.php';
 require __DIR__ . '/correo.php';
 require __DIR__ . '/trabajos.php';
 
+// Una sola lectura por peticion. Si la migracion SLA aun no se ha aplicado,
+// dominio.php conserva automaticamente los objetivos historicos.
+dominio_sla_cargar_politicas($pdo);
+
 // ---------------------------------------------------------------------------
 // Guard global: toda pagina de public/ exige sesion salvo las publicas;
 // todo POST exige token CSRF; las paginas de administracion exigen rol admin.
@@ -42,7 +46,7 @@ if (PHP_SAPI !== 'cli') {
             csrf_verificar();
         }
 
-        $paginas_admin = ['admin_usuarios.php', 'admin_clientes.php', 'admin_auditoria.php', 'admin_ajustes.php', 'cambiar_proveedor.php', 'reprocesar_incidencias.php', 'ver_logs_llm.php'];
+        $paginas_admin = ['admin_inicio.php', 'admin_usuarios.php', 'admin_clientes.php', 'admin_auditoria.php', 'admin_ajustes.php', 'cambiar_proveedor.php', 'reprocesar_incidencias.php', 'ver_logs_llm.php'];
         if (in_array($pagina_actual, $paginas_admin, true)) {
             auth_requerir_rol('admin');
         }

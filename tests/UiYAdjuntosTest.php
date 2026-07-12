@@ -41,4 +41,40 @@ final class UiYAdjuntosTest extends TestCase
             $this->assertArrayNotHasKey($peligrosa, ADJUNTOS_PERMITIDOS, "La extension '$peligrosa' no debe permitirse");
         }
     }
+
+    public function testTarjetaKanbanPuedeParticiparEnAccionesMasivas(): void
+    {
+        $html = ui_render_kanban_card([
+            'id' => 7,
+            'titulo' => 'Prueba',
+            'resumen' => 'Resumen',
+            'urgencia' => 'leve',
+            'estado' => 'abierta',
+            'fecha_creacion' => '2026-07-12 10:00:00',
+        ], [], true);
+
+        $this->assertStringContainsString("class='ticket-check'", $html);
+        $this->assertStringContainsString("form='formAccionesMasivas'", $html);
+        $this->assertStringContainsString("name='ids[]'", $html);
+        $this->assertStringContainsString("class='kanban-controls-disclosure'", $html);
+        $this->assertStringContainsString('<summary>Ajustar</summary>', $html);
+    }
+
+    public function testActividadPuedeDesplegarElContenidoSinSaltarDeSeccion(): void
+    {
+        $html = ui_render_timeline_item([
+            'tipo' => 'mensaje-cliente',
+            'titulo' => 'Mensaje de Cliente',
+            'descripcion' => '',
+            'fecha' => '2026-07-12 10:00:00',
+            'desplegable' => 'Contenido del mensaje',
+            'desplegable_texto' => 'mensaje',
+        ]);
+
+        $this->assertStringContainsString("<details class='timeline-disclosure'>", $html);
+        $this->assertStringContainsString('Ver mensaje', $html);
+        $this->assertStringContainsString('Ocultar mensaje', $html);
+        $this->assertStringContainsString('Contenido del mensaje', $html);
+        $this->assertStringNotContainsString('href=', $html);
+    }
 }

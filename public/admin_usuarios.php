@@ -34,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Rol no valido.';
         } elseif ($rol !== 'cliente' && $cliente_id !== null) {
             $error = 'La empresa solo puede asignarse a usuarios con rol cliente. Cambia el rol a "Cliente" o deja la empresa en blanco.';
+        } elseif ($accion === 'editar' && $password !== '' && strlen($password) < 10) {
+            $error = 'La nueva contrasena debe tener al menos 10 caracteres.';
         }
 
         if ($error === '' && $accion === 'crear') {
@@ -92,13 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (strlen($password) >= 10) {
                         $pdo->prepare("UPDATE usuarios SET hash_password = :h WHERE id = :id")
                             ->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $id]);
-                    } elseif ($password !== '') {
-                        $error = 'La contrasena no se cambio: debe tener al menos 10 caracteres.';
                     }
                     auditar($pdo, 'editar_usuario', "usuario #$id ($email)");
-                    if ($error === '') {
-                        $aviso .= 'Usuario actualizado.';
-                    }
+                    $aviso .= 'Usuario actualizado.';
                 } catch (PDOException $e) {
                     $error = 'Ya existe otro usuario con ese email.';
                 }

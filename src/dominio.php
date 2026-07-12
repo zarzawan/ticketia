@@ -74,6 +74,212 @@ function dominio_ordenes(): array {
     return ['id_desc', 'recientes', 'antiguas', 'urgencia'];
 }
 
+function dominio_niveles_servicio(): array {
+    return [
+        'estandar' => 'Estandar',
+        'preferente' => 'Preferente',
+        'premium' => 'Premium',
+    ];
+}
+
+/** Sustituye la cache de politicas SLA. Util tambien para pruebas unitarias. */
+function dominio_sla_establecer_politicas(array $filas): void {
+    $politicas = [];
+    foreach ($filas as $fila) {
+        $nivel = (string)($fila['nivel_cliente'] ?? '');
+        $tipo = (string)($fila['tipo_incidencia'] ?? '*');
+        $urgencia = (string)($fila['urgencia'] ?? '');
+        if (!isset(dominio_niveles_servicio()[$nivel]) || !in_array($urgencia, dominio_urgencias(), true)) {
+            continue;
+        }
+        $politicas[$nivel][$tipo][$urgencia] = [
+            'primera_respuesta' => max(1, (int)($fila['primera_respuesta_horas'] ?? 1)),
+            'resolucion' => max(1, (int)($fila['resolucion_horas'] ?? 1)),
+        ];
+    }
+    $GLOBALS['ticketia_sla_politicas'] = $politicas;
+}
+
+/** Carga una vez las politicas configurables; antes de migrar usa los valores historicos. */
+function dominio_sla_cargar_politicas(PDO $pdo): void {
+    try {
+        $filas = $pdo->query(
+            "SELECT nivel_cliente, tipo_incidencia, urgencia, primera_respuesta_horas, resolucion_horas
+             FROM sla_politicas WHERE activo = 1"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        dominio_sla_establecer_politicas($filas);
+    } catch (Throwable $e) {
+        dominio_sla_establecer_politicas([]);
+    }
+}
+
+/** Objetivos operativos por urgencia, nivel de cliente y tipo de incidencia. */
+function dominio_sla_objetivos(string $urgencia, string $tipo_incidencia = '', string $nivel_cliente = 'estandar'): array {
+    $objetivos = [
+        'critico' => ['primera_respuesta' => 1, 'resolucion' => 4],
+        'urgente' => ['primera_respuesta' => 4, 'resolucion' => 16],
+        'leve' => ['primera_respuesta' => 8, 'resolucion' => 48],
+    ];
+    $urgencia = in_array($urgencia, dominio_urgencias(), true) ? $urgencia : 'leve';
+    $nivel_cliente = isset(dominio_niveles_servicio()[$nivel_cliente]) ? $nivel_cliente : 'estandar';
+    $politicas = $GLOBALS['ticketia_sla_politicas'] ?? [];
+    $tipo = trim($tipo_incidencia);
+
+    if ($tipo !== '' && isset($politicas[$nivel_cliente][$tipo][$urgencia])) {
+        return $politicas[$nivel_cliente][$tipo][$urgencia] + ['nivel' => $nivel_cliente, 'tipo_politica' => $tipo];
+    }
+    if (isset($politicas[$nivel_cliente]['*'][$urgencia])) {
+        return $politicas[$nivel_cliente]['*'][$urgencia] + ['nivel' => $nivel_cliente, 'tipo_politica' => '*'];
+    }
+    if (isset($politicas['estandar']['*'][$urgencia])) {
+        return $politicas['estandar']['*'][$urgencia] + ['nivel' => 'estandar', 'tipo_politica' => '*'];
+    }
+    return $objetivos[$urgencia] + ['nivel' => $nivel_cliente, 'tipo_politica' => '*'];
+}
+
+/** Calcula un SLA derivado y explicable. $ahora permite pruebas deterministas. */
+function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = null): array {
+    $ahora = $ahora ?? new DateTimeImmutable();
+    try {
+        $creada = new DateTimeImmutable((string)($incidencia['fecha_creacion'] ?? 'now'));
+    } catch (Exception $e) {
+        $creada = $ahora;
+    }
+
+    $objetivos = dominio_sla_objetivos(
+        (string)($incidencia['urgencia'] ?? 'leve'),
+        (string)($incidencia['tipo'] ?? ''),
+        (string)($incidencia['nivel_servicio'] ?? 'estandar')
+    );
+    $limiteRespuesta = $creada->modify('+' . $objetivos['primera_respuesta'] . ' hours');
+    $limiteResolucion = $creada->modify('+' . $objetivos['resolucion'] . ' hours');
+    $cerrada = (string)($incidencia['estado'] ?? '') === 'cerrada';
+    $referencia = $ahora;
+    if ($cerrada && !empty($incidencia['fecha_cierre'])) {
+        try {
+            $referencia = new DateTimeImmutable((string)$incidencia['fecha_cierre']);
+        } catch (Exception $e) {
+            $referencia = $ahora;
+        }
+    }
+
+    $duracionResolucion = max(1, $limiteResolucion->getTimestamp() - $creada->getTimestamp());
+    $consumidoResolucion = max(0, $referencia->getTimestamp() - $creada->getTimestamp());
+    $porcentajeResolucion = (int)round(($consumidoResolucion / $duracionResolucion) * 100);
+    $restanteResolucion = $limiteResolucion->getTimestamp() - $referencia->getTimestamp();
+    $estadoResolucion = $referencia > $limiteResolucion ? 'vencido' : ($porcentajeResolucion >= 75 ? 'riesgo' : 'ok');
+    if ($cerrada && $estadoResolucion !== 'vencido') {
+        $estadoResolucion = 'cumplido';
+    }
+
+    $primeraRespuesta = null;
+    if (!empty($incidencia['primera_respuesta'])) {
+        try {
+            $primeraRespuesta = new DateTimeImmutable((string)$incidencia['primera_respuesta']);
+        } catch (Exception $e) {
+            $primeraRespuesta = null;
+        }
+    }
+    $referenciaRespuesta = $primeraRespuesta ?? $referencia;
+    $duracionRespuesta = max(1, $limiteRespuesta->getTimestamp() - $creada->getTimestamp());
+    $consumidoRespuesta = max(0, $referenciaRespuesta->getTimestamp() - $creada->getTimestamp());
+    $porcentajeRespuesta = (int)round(($consumidoRespuesta / $duracionRespuesta) * 100);
+    if ($referenciaRespuesta > $limiteRespuesta) {
+        $estadoRespuesta = 'vencido';
+    } elseif ($primeraRespuesta !== null) {
+        $estadoRespuesta = 'cumplido';
+    } elseif ($porcentajeRespuesta >= 75) {
+        $estadoRespuesta = 'riesgo';
+    } else {
+        $estadoRespuesta = 'ok';
+    }
+
+    if ($estadoResolucion === 'vencido' || $estadoRespuesta === 'vencido') {
+        $estado = 'vencido';
+    } elseif ($estadoResolucion === 'riesgo' || $estadoRespuesta === 'riesgo') {
+        $estado = 'riesgo';
+    } elseif ($cerrada) {
+        $estado = 'cumplido';
+    } else {
+        $estado = 'ok';
+    }
+
+    $objetivoActual = $primeraRespuesta === null && in_array($estadoRespuesta, ['riesgo', 'vencido'], true)
+        ? 'primera_respuesta'
+        : 'resolucion';
+    $porcentaje = $objetivoActual === 'primera_respuesta' ? $porcentajeRespuesta : $porcentajeResolucion;
+    $restanteSegundos = $objetivoActual === 'primera_respuesta'
+        ? $limiteRespuesta->getTimestamp() - $referenciaRespuesta->getTimestamp()
+        : $restanteResolucion;
+
+    return [
+        'estado' => $estado,
+        'porcentaje' => min(100, max(0, $porcentaje)),
+        'objetivo_respuesta_horas' => $objetivos['primera_respuesta'],
+        'objetivo_resolucion_horas' => $objetivos['resolucion'],
+        'limite_respuesta' => $limiteRespuesta->format('Y-m-d H:i:s'),
+        'limite_resolucion' => $limiteResolucion->format('Y-m-d H:i:s'),
+        'restante_segundos' => $restanteSegundos,
+        'objetivo_actual' => $objetivoActual,
+        'estado_respuesta' => $estadoRespuesta,
+        'estado_resolucion' => $estadoResolucion,
+        'porcentaje_respuesta' => min(100, max(0, $porcentajeRespuesta)),
+        'porcentaje_resolucion' => min(100, max(0, $porcentajeResolucion)),
+        'nivel_servicio' => $objetivos['nivel'],
+        'tipo_politica' => $objetivos['tipo_politica'],
+    ];
+}
+
+function dominio_duracion_humana(int $segundos): string {
+    $pasado = $segundos < 0;
+    $horas = intdiv(abs($segundos), 3600);
+    $dias = intdiv($horas, 24);
+    $horas %= 24;
+    $texto = $dias > 0 ? $dias . 'd ' . $horas . 'h' : max(1, $horas) . 'h';
+    return $pasado ? 'Vencido hace ' . $texto : $texto . ' restantes';
+}
+
+/** Determina quien debe realizar el siguiente movimiento publico del hilo. */
+function dominio_turno_atencion(?string $ultimo_autor, string $estado): array {
+    if ($estado === 'cerrada') {
+        return ['clave' => 'resuelto', 'label' => 'Resuelto'];
+    }
+    if ($ultimo_autor === 'tecnico') {
+        return ['clave' => 'cliente', 'label' => 'Esperando al cliente'];
+    }
+    return ['clave' => 'equipo', 'label' => 'Requiere respuesta'];
+}
+
+/** Desglose transparente para que la puntuacion operativa sea verificable. */
+function dominio_prioridad_operativa_desglose(array $incidencia, ?DateTimeImmutable $ahora = null): array {
+    $urgencia = (string)($incidencia['urgencia'] ?? 'leve');
+    $puntos = ['critico' => 55, 'urgente' => 30, 'leve' => 10][$urgencia] ?? 10;
+    $urgencia_label = ['critico' => 'Critica', 'urgente' => 'Urgente', 'leve' => 'Leve'][$urgencia] ?? ucfirst($urgencia);
+    $factores = [['label' => 'Urgencia ' . $urgencia_label, 'puntos' => $puntos]];
+    $sla = dominio_sla_calcular($incidencia, $ahora);
+    if ($sla['estado'] === 'vencido') {
+        $puntos += 30;
+        $factores[] = ['label' => 'SLA vencido', 'puntos' => 30];
+    } elseif ($sla['estado'] === 'riesgo') {
+        $puntos += 15;
+        $factores[] = ['label' => 'SLA en riesgo', 'puntos' => 15];
+    }
+    if (empty($incidencia['asignado_id'])) {
+        $puntos += 10;
+        $factores[] = ['label' => 'Sin responsable', 'puntos' => 10];
+    }
+    if (($incidencia['ultimo_autor'] ?? null) !== 'tecnico' && ($incidencia['estado'] ?? '') !== 'cerrada') {
+        $puntos += 10;
+        $factores[] = ['label' => 'Requiere respuesta del equipo', 'puntos' => 10];
+    }
+    return ['total' => min(100, $puntos), 'factores' => $factores];
+}
+
+/** Puntuacion de 0 a 100 para ordenar la atencion del equipo. */
+function dominio_prioridad_operativa(array $incidencia, ?DateTimeImmutable $ahora = null): int {
+    return dominio_prioridad_operativa_desglose($incidencia, $ahora)['total'];
+}
+
 /**
  * Anade a $sql/$params las condiciones de filtro comunes del panel.
  * $f admite: busqueda, tipo, urgencia, estado, desde, hasta.
