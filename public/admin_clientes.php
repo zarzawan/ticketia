@@ -47,7 +47,7 @@ $clientes = $pdo->query(
     "SELECT c.*,
             (SELECT COUNT(*) FROM usuarios u WHERE u.cliente_id = c.id) AS usuarios,
             (SELECT COUNT(*) FROM incidencias i WHERE i.cliente_id = c.id) AS tickets,
-            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado <> 'cerrada') AS tickets_abiertos
+            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado IN ('abierta','en_curso')) AS tickets_abiertos
      FROM clientes c ORDER BY c.nombre"
 )->fetchAll(PDO::FETCH_ASSOC);
 

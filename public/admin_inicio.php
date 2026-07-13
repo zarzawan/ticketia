@@ -6,10 +6,12 @@ $resumen = $pdo->query(
     "SELECT
         (SELECT COUNT(*) FROM usuarios WHERE activo = 1) AS usuarios_activos,
         (SELECT COUNT(*) FROM clientes WHERE activo = 1) AS empresas_activas,
-        (SELECT COUNT(*) FROM incidencias WHERE estado <> 'cerrada') AS tickets_abiertos,
-        (SELECT COUNT(*) FROM incidencias WHERE estado <> 'cerrada' AND urgencia = 'critico') AS tickets_criticos,
-        (SELECT COUNT(*) FROM incidencias WHERE estado <> 'cerrada' AND asignado_id IS NULL) AS sin_asignar,
-        (SELECT COUNT(*) FROM incidencias WHERE estado <> 'cerrada' AND fecha_creacion < NOW() - INTERVAL 48 HOUR) AS fuera_objetivo,
+        (SELECT COUNT(*) FROM incidencias WHERE estado IN ('abierta','en_curso')) AS tickets_abiertos,
+        (SELECT COUNT(*) FROM incidencias WHERE estado IN ('abierta','en_curso') AND urgencia = 'critico') AS tickets_criticos,
+        (SELECT COUNT(*) FROM incidencias WHERE estado IN ('abierta','en_curso') AND asignado_id IS NULL) AS sin_asignar,
+        (SELECT COUNT(*) FROM incidencias WHERE estado IN ('abierta','en_curso') AND fecha_creacion < NOW() - INTERVAL 48 HOUR) AS fuera_objetivo,
+        (SELECT COUNT(*) FROM incidencias WHERE estado = 'resuelta') AS por_confirmar,
+        (SELECT COUNT(*) FROM incidencias WHERE fecha_archivo IS NOT NULL) AS archivadas,
         (SELECT COUNT(*) FROM trabajos_ia WHERE estado IN ('pendiente','en_curso')) AS cola_ia,
         (SELECT COUNT(*) FROM trabajos_ia WHERE estado = 'fallido') AS fallos_ia"
 )->fetch(PDO::FETCH_ASSOC);
@@ -18,8 +20,8 @@ $agentes = $pdo->query(
     "SELECT u.id, u.nombre, u.rol,
             SUM(i.estado = 'abierta') AS abiertas,
             SUM(i.estado = 'en_curso') AS en_curso,
-            SUM(i.estado <> 'cerrada' AND i.urgencia = 'critico') AS criticas,
-            SUM(i.estado <> 'cerrada') AS total
+            SUM(i.estado IN ('abierta','en_curso') AND i.urgencia = 'critico') AS criticas,
+            SUM(i.estado IN ('abierta','en_curso')) AS total
      FROM usuarios u
      LEFT JOIN incidencias i ON i.asignado_id = u.id
      WHERE u.activo = 1 AND u.rol IN ('admin','operador')
@@ -36,7 +38,7 @@ $prioritarias = $pdo->query(
      FROM incidencias i
      LEFT JOIN usuarios u ON u.id = i.asignado_id
      LEFT JOIN clientes c ON c.id = i.cliente_id
-     WHERE i.estado <> 'cerrada'
+     WHERE i.estado IN ('abierta','en_curso')
      ORDER BY (i.urgencia = 'critico') DESC, (i.asignado_id IS NULL) DESC, i.fecha_creacion ASC
      LIMIT 6"
 )->fetchAll(PDO::FETCH_ASSOC);
@@ -78,6 +80,9 @@ ui_admin_cabecera('Resumen', 'Prioridades, equipo y salud del sistema en una sol
     </a>
     <a class="admin-kpi" href="admin_ajustes.php">
         <span class="admin-kpi-icon tone-violet">IA</span><span><small>Cola de IA</small><strong><?= (int)$resumen['cola_ia'] ?></strong><em><?= (int)$resumen['fallos_ia'] ?> trabajos fallidos</em></span>
+    </a>
+    <a class="admin-kpi" href="admin_flujos.php">
+        <span class="admin-kpi-icon tone-green">FL</span><span><small>Esperan confirmacion</small><strong><?= (int)$resumen['por_confirmar'] ?></strong><em><?= (int)$resumen['archivadas'] ?> en archivo</em></span>
     </a>
 </section>
 
@@ -139,6 +144,8 @@ ui_admin_cabecera('Resumen', 'Prioridades, equipo y salud del sistema en una sol
             <a href="admin_usuarios.php"><span>+</span><strong>Crear usuario</strong><small>Alta y permisos</small></a>
             <a href="admin_clientes.php"><span>+</span><strong>Nueva empresa</strong><small>Cliente del portal</small></a>
             <a href="admin_ajustes.php"><span>IA</span><strong>Probar IA</strong><small>Conexion y cola</small></a>
+            <a href="admin_flujos.php"><span>FL</span><strong>Configurar flujo</strong><small>Cierre y archivo</small></a>
+            <a href="admin_catalogo.php"><span>CA</span><strong>Editar catalogo</strong><small>Contexto comercial IA</small></a>
             <a href="admin_auditoria.php"><span>AU</span><strong>Auditar</strong><small>Revisar acciones</small></a>
         </div>
     </section>

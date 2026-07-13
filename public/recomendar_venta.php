@@ -22,7 +22,7 @@ if (!$incidencia) {
     exit;
 }
 
-$sql_productos = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo FROM catalogo_productos";
+$sql_productos = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo FROM catalogo_productos WHERE activo = 1";
 $stmt_productos = $pdo->query($sql_productos);
 $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
 $catalogo = json_encode($productos);

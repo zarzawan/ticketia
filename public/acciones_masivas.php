@@ -20,7 +20,7 @@ $pdo->beginTransaction();
 try {
     if (str_starts_with($accion, 'estado:')) {
         $estado = substr($accion, 7);
-        if (!in_array($estado, dominio_estados(), true)) {
+        if (!in_array($estado, dominio_estados_activos(), true)) {
             throw new InvalidArgumentException('Estado no valido');
         }
         foreach ($ids as $id) {

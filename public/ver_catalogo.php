@@ -9,7 +9,7 @@ $filtro_esfuerzo = isset($_GET['filtro_esfuerzo']) ? trim($_GET['filtro_esfuerzo
 // Construir la consulta SQL con filtros dinámicos
 $sql = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo 
         FROM catalogo_productos 
-        WHERE 1=1";
+        WHERE activo = 1";
 $params = [];
 
 if ($busqueda) {

@@ -6,8 +6,10 @@ require_once __DIR__ . '/../src/arranque.php';
 $usuario = auth_usuario();
 $mensaje_exito = isset($_GET['ok']) && $_GET['ok'] == '1';
 
-$filtro_estado = in_array($_GET['estado'] ?? '', dominio_estados(), true) ? (string)$_GET['estado'] : '';
+$vista = ($_GET['vista'] ?? '') === 'historial' ? 'historial' : 'activas';
+$filtro_estado = in_array($_GET['estado'] ?? '', ['abierta', 'en_curso', 'resuelta'], true) ? (string)$_GET['estado'] : '';
 $busqueda = trim((string)($_GET['q'] ?? ''));
+$cursor = filter_input(INPUT_GET, 'antes_de', FILTER_VALIDATE_INT) ?: null;
 
 // Ambito del cliente: los tickets de su empresa o, sin empresa, los suyos.
 if ($usuario['cliente_id'] !== null) {
@@ -22,6 +24,7 @@ $stats = $pdo->prepare(
     "SELECT COUNT(*) AS total,
             SUM(estado = 'abierta') AS abiertas,
             SUM(estado = 'en_curso') AS en_curso,
+            SUM(estado = 'resuelta') AS resueltas,
             SUM(estado = 'cerrada') AS cerradas
      FROM incidencias WHERE $ambito_sql"
 );
@@ -36,15 +39,26 @@ $params = [':ambito' => $ambito_valor];
 if ($filtro_estado !== '') {
     $sql .= " AND estado = :estado";
     $params[':estado'] = $filtro_estado;
+} elseif ($vista === 'historial') {
+    $sql .= " AND estado = 'cerrada'";
+} else {
+    $sql .= " AND estado IN ('abierta','en_curso','resuelta')";
 }
 if ($busqueda !== '') {
     $sql .= " AND (titulo LIKE :busqueda OR descripcion LIKE :busqueda)";
     $params[':busqueda'] = "%$busqueda%";
 }
-$sql .= " ORDER BY fecha_creacion DESC";
+if ($cursor !== null) {
+    $sql .= " AND id < :cursor";
+    $params[':cursor'] = $cursor;
+}
+$sql .= " ORDER BY id DESC LIMIT 51";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$hayMas = count($tickets) > 50;
+if ($hayMas) array_pop($tickets);
+$siguienteCursor = $hayMas && $tickets ? (int)end($tickets)['id'] : null;
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -72,10 +86,10 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 
     <section class="stat-strip portal-stats">
-        <a class="stat <?= $filtro_estado === '' ? 'stat-activo' : '' ?>" href="portal.php"><span class="stat-value"><?= (int)$stats['total'] ?></span><span class="stat-label">Todos</span></a>
-        <a class="stat <?= $filtro_estado === 'abierta' ? 'stat-activo' : '' ?>" href="portal.php?estado=abierta"><span class="stat-value"><?= (int)$stats['abiertas'] ?></span><span class="stat-label">Abiertos</span></a>
-        <a class="stat <?= $filtro_estado === 'en_curso' ? 'stat-activo' : '' ?>" href="portal.php?estado=en_curso"><span class="stat-value"><?= (int)$stats['en_curso'] ?></span><span class="stat-label">En curso</span></a>
-        <a class="stat <?= $filtro_estado === 'cerrada' ? 'stat-activo' : '' ?>" href="portal.php?estado=cerrada"><span class="stat-value"><?= (int)$stats['cerradas'] ?></span><span class="stat-label">Cerrados</span></a>
+        <a class="stat <?= $vista === 'activas' && $filtro_estado === '' ? 'stat-activo' : '' ?>" href="portal.php"><span class="stat-value"><?= (int)$stats['abiertas'] + (int)$stats['en_curso'] + (int)$stats['resueltas'] ?></span><span class="stat-label">Activos</span></a>
+        <a class="stat <?= $filtro_estado === 'abierta' ? 'stat-activo' : '' ?>" href="portal.php?estado=abierta"><span class="stat-value"><?= (int)$stats['abiertas'] ?></span><span class="stat-label">Nuevas</span></a>
+        <a class="stat <?= $filtro_estado === 'resuelta' ? 'stat-activo' : '' ?>" href="portal.php?estado=resuelta"><span class="stat-value"><?= (int)$stats['resueltas'] ?></span><span class="stat-label">Confirmar solucion</span></a>
+        <a class="stat <?= $vista === 'historial' ? 'stat-activo' : '' ?>" href="portal.php?vista=historial"><span class="stat-value"><?= (int)$stats['cerradas'] ?></span><span class="stat-label">Historial</span></a>
     </section>
 
     <div class="portal-layout">
@@ -101,12 +115,13 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <div class="incidencia-box compact-box portal-ticket-panel">
         <div class="section-head portal-ticket-head">
-            <div><span class="portal-kicker">Seguimiento</span><h2>Mis tickets <span class="portal-count"><?= count($tickets) ?></span></h2></div>
+            <div><span class="portal-kicker">Seguimiento</span><h2><?= $vista === 'historial' ? 'Historial' : 'Solicitudes activas' ?> <span class="portal-count"><?= count($tickets) ?></span></h2></div>
             <form method="GET" class="portal-search">
+                <?php if ($vista === 'historial'): ?><input type="hidden" name="vista" value="historial"><?php endif; ?>
                 <?php if ($filtro_estado !== ''): ?><input type="hidden" name="estado" value="<?= ui_e($filtro_estado) ?>"><?php endif; ?>
                 <input type="search" name="q" value="<?= ui_e($busqueda) ?>" placeholder="Buscar solicitudes" aria-label="Buscar solicitudes">
                 <button type="submit" class="card-button secondary-button">Buscar</button>
-                <?php if ($busqueda !== ''): ?><a href="portal.php<?= $filtro_estado !== '' ? '?estado=' . urlencode($filtro_estado) : '' ?>">Limpiar</a><?php endif; ?>
+                <?php if ($busqueda !== ''): ?><a href="portal.php<?= $vista === 'historial' ? '?vista=historial' : ($filtro_estado !== '' ? '?estado=' . urlencode($filtro_estado) : '') ?>">Limpiar</a><?php endif; ?>
             </form>
         </div>
         <?php if (empty($tickets)): ?>
@@ -126,6 +141,9 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </a>
                 <?php endforeach; ?>
             </div>
+        <?php endif; ?>
+        <?php if ($siguienteCursor !== null): ?>
+            <a class="history-more" href="portal.php?<?= ui_e(http_build_query(array_filter(['vista' => $vista === 'historial' ? 'historial' : null, 'estado' => $filtro_estado ?: null, 'q' => $busqueda ?: null, 'antes_de' => $siguienteCursor]))) ?>">Ver 50 anteriores</a>
         <?php endif; ?>
     </div>
     </div>

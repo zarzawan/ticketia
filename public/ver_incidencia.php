@@ -44,7 +44,8 @@ foreach ($mensajes as $mensaje_operativo) {
     }
 }
 $sla = dominio_sla_calcular($incidencia + ['primera_respuesta' => $primera_respuesta]);
-$turno_atencion = dominio_turno_atencion($ultimo_autor_publico, (string)$incidencia['estado']);
+$siguiente_paso = dominio_siguiente_paso($ultimo_autor_publico, (string)$incidencia['estado']);
+$es_activa = in_array((string)$incidencia['estado'], dominio_estados_activos(), true);
 $prioridad_info = dominio_prioridad_operativa_desglose($incidencia + ['ultimo_autor' => $ultimo_autor_publico]);
 $prioridad_operativa = $prioridad_info['total'];
 
@@ -68,8 +69,10 @@ $stmt_reaperturas->execute([':id' => $id]);
 $reaperturas = $stmt_reaperturas->fetchAll(PDO::FETCH_ASSOC);
 
 $fecha_creacion = new DateTime($incidencia['fecha_creacion']);
-$hoy = new DateTime();
-$dias_abierta = $fecha_creacion->diff($hoy)->days;
+$fin_antiguedad = !empty($incidencia['fecha_resolucion'])
+    ? new DateTime((string)$incidencia['fecha_resolucion'])
+    : new DateTime();
+$dias_abierta = $fecha_creacion->diff($fin_antiguedad)->days;
 $antiguedad_label = $dias_abierta > 30 ? 'Antigua' : ($dias_abierta > 15 ? 'Media' : 'Reciente');
 
 $mostrar_traduccion = isset($_GET['traducir']) && $_GET['traducir'] === 'es';
@@ -258,12 +261,26 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
             <button type="button" class="card-button secondary-button" id="copyTicketId">Copiar ID</button>
         </div>
 
+        <?php if (($_GET['resolucion'] ?? '') === 'ok'): ?>
+            <div class="success-message">Solucion propuesta al cliente. El ticket salio de la cola activa.</div>
+        <?php elseif (($_GET['resolucion'] ?? '') === 'error'): ?>
+            <div class="login-error">No se pudo proponer la solucion. Revisa el codigo, las notas y el estado actual.</div>
+        <?php endif; ?>
+
         <div class="detail-layout">
             <div class="detail-main">
                 <div class="incidencia-box compact-box issue-text-card" id="descripcion">
                     <h2>Texto de la incidencia</h2>
                     <?= ui_render_markdown_block((string)$traduccion['descripcion'], 'recomendacion-text') ?>
                 </div>
+
+                <?php if (in_array((string)$incidencia['estado'], ['resuelta', 'cerrada'], true)): ?>
+                    <section class="resolution-summary">
+                        <div><span class="support-eyebrow">Resultado</span><h2><?= ui_e(dominio_codigos_resolucion()[$incidencia['resolucion_codigo']] ?? 'Solucion registrada') ?></h2></div>
+                        <p><?= nl2br(ui_e((string)($incidencia['resolucion_notas'] ?? 'Sin notas de resolucion.'))) ?></p>
+                        <?php if (($incidencia['estado'] ?? '') === 'resuelta'): ?><small>Esperando la confirmacion del cliente.</small><?php endif; ?>
+                    </section>
+                <?php endif; ?>
 
                 <section class="copilot-card" id="copilotCard">
                     <header>
@@ -285,7 +302,7 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     </div>
                     <div class="copilot-draft" id="copilotDraft" <?= empty($copiloto['respuesta_sugerida']) ? 'hidden' : '' ?>>
                         <span>Borrador sugerido</span><p id="copilotRespuesta"><?= ui_e($copiloto['respuesta_sugerida'] ?? '') ?></p>
-                        <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?><button type="button" class="card-button secondary-button" id="usarBorrador">Usar en respuesta</button><?php endif; ?>
+                        <?php if ($es_activa): ?><button type="button" class="card-button secondary-button" id="usarBorrador">Usar en respuesta</button><?php endif; ?>
                     </div>
 
                     <?php if (($incidencia['tipo'] ?? '') === 'Comercial'): ?>
@@ -337,7 +354,7 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     <p class="help-line">Todavia no hay mensajes en esta incidencia.</p>
                 <?php endif; ?>
 
-                <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
+                <?php if ($es_activa): ?>
                     <form action="guardar_mensaje.php" method="POST" class="composer conversation-composer">
                         <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                         <textarea name="mensaje" id="mensaje" rows="7" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
@@ -350,7 +367,7 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         </div>
                     </form>
                 <?php else: ?>
-                    <p class="help-line">La incidencia esta cerrada y no se pueden anadir mas mensajes.</p>
+                    <p class="help-line">El trabajo esta finalizado. Reabre la incidencia para anadir una respuesta.</p>
                 <?php endif; ?>
                 </div>
                 <div class="incidencia-box compact-box" id="adjuntos">
@@ -372,13 +389,15 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     <?php else: ?>
                         <p class="help-line">No hay adjuntos en esta incidencia.</p>
                     <?php endif; ?>
-                    <form action="subir_adjunto.php" method="POST" enctype="multipart/form-data" class="composer-row adjuntos-form">
-                        <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                        <input type="file" name="adjunto" required>
-                        <span class="composer-spacer"></span>
-                        <input type="submit" value="Subir adjunto">
-                    </form>
-                    <p class="help-line">Maximo <?= ui_e(adjuntos_formato_tamano(adjuntos_max_bytes())) ?> por fichero.</p>
+                    <?php if ($es_activa): ?>
+                        <form action="subir_adjunto.php" method="POST" enctype="multipart/form-data" class="composer-row adjuntos-form">
+                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
+                            <input type="file" name="adjunto" required>
+                            <span class="composer-spacer"></span>
+                            <input type="submit" value="Subir adjunto">
+                        </form>
+                        <p class="help-line">Maximo <?= ui_e(adjuntos_formato_tamano(adjuntos_max_bytes())) ?> por fichero.</p>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -393,7 +412,7 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         <div class="sla-progress"><i style="width: <?= (int)$sla['porcentaje'] ?>%"></i></div>
                         <div class="detail-sla-meta">
                             <small>Objetivo de <?= $sla['objetivo_actual'] === 'primera_respuesta' ? 'primera respuesta' : 'resolucion' ?>: <?= (int)($sla['objetivo_actual'] === 'primera_respuesta' ? $sla['objetivo_respuesta_horas'] : $sla['objetivo_resolucion_horas']) ?> h</small>
-                            <span class="turn-badge <?= ui_e($turno_atencion['clave']) ?>"><?= ui_e($turno_atencion['label']) ?></span>
+                            <span class="turn-badge <?= ui_e($siguiente_paso['clave']) ?>"><?= ui_e($siguiente_paso['label']) ?></span>
                         </div>
                         <small>Primera respuesta: <?= $primera_respuesta !== null ? ui_e(date('d/m H:i', strtotime($primera_respuesta))) : 'Pendiente' ?></small>
                     </div>
@@ -417,8 +436,8 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                             </div>
                         <?php endif; ?>
                         <div class="detail-row">
-                            <span>Edad</span>
-                            <strong><?= (int)$dias_abierta ?> dias · <?= ui_e($antiguedad_label) ?></strong>
+                            <span><?= $es_activa ? 'Edad' : 'Tiempo hasta solucion' ?></span>
+                            <strong><?= (int)$dias_abierta ?> dias<?= $es_activa ? ' · ' . ui_e($antiguedad_label) : '' ?></strong>
                         </div>
                         <div class="detail-row">
                             <span>Idioma</span>
@@ -466,13 +485,23 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         </div>
                     </div>
 
-                    <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
-                        <form action="cerrar_incidencia.php" method="POST" class="detail-action" onsubmit="return confirm('Se cerrara la incidencia. Continuar?');">
+                    <?php if ($es_activa): ?>
+                        <form action="cerrar_incidencia.php" method="POST" class="detail-action form-stack resolution-form">
                             <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                            <button type="submit" class="card-button danger-button">Cerrar incidencia</button>
+                            <h3>Proponer solucion</h3>
+                            <p class="help-line">Saca el ticket de la cola activa y pide confirmacion al cliente.</p>
+                            <label class="filter-label" for="resolucion_codigo">Resultado</label>
+                            <select name="resolucion_codigo" id="resolucion_codigo" required>
+                                <?php foreach (dominio_codigos_resolucion() as $codigo => $etiqueta): ?>
+                                    <option value="<?= ui_e($codigo) ?>"><?= ui_e($etiqueta) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="filter-label" for="resolucion_notas">Que se hizo</label>
+                            <textarea name="resolucion_notas" id="resolucion_notas" rows="4" required placeholder="Explica la solucion de forma util para el cliente y futuras incidencias."></textarea>
+                            <button type="submit" class="card-button">Proponer solucion</button>
                         </form>
                     <?php else: ?>
-                        <form action="reabrir_incidencia.php" method="POST" class="detail-action form-stack" onsubmit="return confirm('Se reabrira la incidencia. Continuar?');">
+                        <form action="reabrir_incidencia.php" method="POST" class="detail-action form-stack">
                             <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                             <label class="filter-label" for="motivo">Motivo de la reapertura</label>
                             <textarea name="motivo" id="motivo" rows="3" required></textarea>

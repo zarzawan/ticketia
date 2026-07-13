@@ -20,7 +20,9 @@ final class UiYAdjuntosTest extends TestCase
 
     public function testEtiquetasDeEstadoYUrgencia(): void
     {
-        $this->assertSame('En curso', ui_estado_label('en_curso'));
+        $this->assertSame('Nueva', ui_estado_label('abierta'));
+        $this->assertSame('En trabajo', ui_estado_label('en_curso'));
+        $this->assertSame('Solucion propuesta', ui_estado_label('resuelta'));
         $this->assertSame('Critica', ui_urgencia_label('critico'));
         // Valores desconocidos degradan a algo legible, nunca rompen.
         $this->assertSame('Otro estado', ui_estado_label('otro_estado'));

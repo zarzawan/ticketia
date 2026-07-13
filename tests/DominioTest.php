@@ -7,7 +7,9 @@ final class DominioTest extends TestCase
     public function testCatalogosBasicos(): void
     {
         $this->assertSame(['critico', 'urgente', 'leve'], dominio_urgencias());
-        $this->assertSame(['abierta', 'en_curso', 'cerrada'], dominio_estados());
+        $this->assertSame(['abierta', 'en_curso', 'resuelta', 'cerrada'], dominio_estados());
+        $this->assertSame(['abierta', 'en_curso'], dominio_estados_activos());
+        $this->assertSame('Solucion permanente', dominio_codigos_resolucion()['solucion_permanente']);
         $this->assertContains('id_desc', dominio_ordenes());
         $this->assertNotEmpty(dominio_tipos());
     }
@@ -106,11 +108,26 @@ final class DominioTest extends TestCase
         $this->assertSame('primera_respuesta', $sla['objetivo_actual']);
     }
 
-    public function testTurnoYPrioridadOperativaSonExplicables(): void
+    public function testSlaSeDetieneAlProponerSolucion(): void
     {
-        $this->assertSame('equipo', dominio_turno_atencion('cliente', 'en_curso')['clave']);
-        $this->assertSame('cliente', dominio_turno_atencion('tecnico', 'en_curso')['clave']);
-        $this->assertSame('resuelto', dominio_turno_atencion('cliente', 'cerrada')['clave']);
+        $sla = dominio_sla_calcular([
+            'fecha_creacion' => '2026-07-12 10:00:00',
+            'fecha_resolucion' => '2026-07-12 12:00:00',
+            'urgencia' => 'critico',
+            'estado' => 'resuelta',
+            'primera_respuesta' => '2026-07-12 10:30:00',
+        ], new DateTimeImmutable('2026-07-14 12:00:00'));
+
+        $this->assertSame('cumplido', $sla['estado']);
+        $this->assertSame(7200, $sla['restante_segundos']);
+    }
+
+    public function testSiguientePasoYPrioridadOperativaSonExplicables(): void
+    {
+        $this->assertSame('Responder ahora', dominio_siguiente_paso('cliente', 'en_curso')['label']);
+        $this->assertSame('Esperando al cliente', dominio_siguiente_paso('tecnico', 'en_curso')['label']);
+        $this->assertSame('Esperando confirmacion', dominio_siguiente_paso('tecnico', 'resuelta')['label']);
+        $this->assertSame('Finalizada', dominio_siguiente_paso('cliente', 'cerrada')['label']);
         $puntos = dominio_prioridad_operativa([
             'fecha_creacion' => '2026-07-12 10:00:00',
             'urgencia' => 'critico',

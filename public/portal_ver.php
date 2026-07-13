@@ -30,6 +30,7 @@ $adjuntos = adjuntos_de($pdo, (int)$id);
 
 $id_incidencia = (int)$id;
 $estado_label = ui_estado_label((string)$incidencia['estado']);
+$es_activa = in_array((string)$incidencia['estado'], dominio_estados_activos(), true);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -65,11 +66,41 @@ $estado_label = ui_estado_label((string)$incidencia['estado']);
     <?php if (isset($_GET['ok'])): ?>
         <div class="success-message">Tu mensaje se ha enviado al equipo de soporte.</div>
     <?php endif; ?>
+    <?php if (($_GET['confirmacion'] ?? '') === 'aceptada'): ?>
+        <div class="success-message">Gracias. La solucion ha quedado confirmada y el ticket se ha cerrado.</div>
+    <?php elseif (($_GET['confirmacion'] ?? '') === 'rechazada'): ?>
+        <div class="success-message">La incidencia vuelve al equipo con tu comentario.</div>
+    <?php elseif (($_GET['confirmacion'] ?? '') === 'motivo'): ?>
+        <div class="login-error">Explica brevemente por que la solucion no ha funcionado.</div>
+    <?php endif; ?>
 
     <div class="incidencia-box compact-box">
         <h2>Descripcion</h2>
         <div class="recomendacion-text" style="white-space:pre-wrap;"><?= ui_e($incidencia['descripcion']) ?></div>
     </div>
+
+    <?php if (($incidencia['estado'] ?? '') === 'resuelta'): ?>
+        <section class="portal-resolution-card">
+            <span class="support-eyebrow">Solucion propuesta</span>
+            <h2><?= ui_e(dominio_codigos_resolucion()[$incidencia['resolucion_codigo']] ?? 'El equipo ha resuelto la solicitud') ?></h2>
+            <p><?= nl2br(ui_e((string)($incidencia['resolucion_notas'] ?? ''))) ?></p>
+            <div class="portal-resolution-actions">
+                <form action="confirmar_resolucion.php" method="POST">
+                    <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><input type="hidden" name="decision" value="aceptar"><?= csrf_campo() ?>
+                    <button type="submit" class="card-button">Si, esta solucionado</button>
+                </form>
+                <details>
+                    <summary>No, necesito mas ayuda</summary>
+                    <form action="confirmar_resolucion.php" method="POST" class="form-stack">
+                        <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><input type="hidden" name="decision" value="rechazar"><?= csrf_campo() ?>
+                        <label for="motivo">Que sigue fallando</label>
+                        <textarea id="motivo" name="motivo" rows="3" required></textarea>
+                        <button type="submit" class="card-button secondary-button">Devolver al equipo</button>
+                    </form>
+                </details>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <div class="incidencia-box compact-box">
         <h2>Conversacion</h2>
@@ -95,7 +126,7 @@ $estado_label = ui_estado_label((string)$incidencia['estado']);
             <p class="help-line">Todavia no hay respuestas. El equipo de soporte respondera lo antes posible.</p>
         <?php endif; ?>
 
-        <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
+        <?php if ($es_activa): ?>
             <form action="guardar_mensaje.php" method="POST" class="composer">
                 <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                 <textarea name="mensaje" rows="4" required placeholder="Escribe tu mensaje para el equipo de soporte..."></textarea>
@@ -104,8 +135,10 @@ $estado_label = ui_estado_label((string)$incidencia['estado']);
                     <input type="submit" value="Enviar">
                 </div>
             </form>
+        <?php elseif (($incidencia['estado'] ?? '') === 'cerrada'): ?>
+            <p class="help-line">Este ticket esta cerrado. Si el problema vuelve a aparecer, abre uno nuevo desde <a href="portal.php">Mis tickets</a>.</p>
         <?php else: ?>
-            <p class="help-line">Este ticket esta cerrado. Si el problema vuelve a aparecer, abre un ticket nuevo desde <a href="portal.php">Mis tickets</a>.</p>
+            <p class="help-line">Revisa la solucion propuesta arriba para confirmar si necesitas mas ayuda.</p>
         <?php endif; ?>
     </div>
 
@@ -128,7 +161,7 @@ $estado_label = ui_estado_label((string)$incidencia['estado']);
         <?php else: ?>
             <p class="help-line">No hay adjuntos en este ticket.</p>
         <?php endif; ?>
-        <?php if (($incidencia['estado'] ?? '') !== 'cerrada'): ?>
+        <?php if ($es_activa): ?>
             <form action="subir_adjunto.php" method="POST" enctype="multipart/form-data" class="composer-row adjuntos-form">
                 <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                 <input type="file" name="adjunto" required>

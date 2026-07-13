@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
 $nuevo_estado = isset($_POST['estado']) ? trim((string)$_POST['estado']) : '';
 
-$estados_validos = ['abierta', 'en_curso', 'cerrada'];
+$estados_validos = dominio_estados_activos();
 
 if (!$id_incidencia || !in_array($nuevo_estado, $estados_validos, true)) {
     http_response_code(400);

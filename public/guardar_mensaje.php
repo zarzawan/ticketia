@@ -18,7 +18,7 @@ if (!$id_incidencia || $mensaje === '') {
     exit;
 }
 
-// Un cliente solo puede escribir en tickets de su ambito y nunca cerrados.
+// Un cliente solo puede escribir en tickets de su ambito y mientras estan activos.
 if ($es_cliente) {
     if (!incidencia_visible_para_cliente($pdo, (int)$id_incidencia, auth_usuario())) {
         header('Location: portal.php');
@@ -26,7 +26,7 @@ if ($es_cliente) {
     }
     $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
     $stmt->execute([':id' => $id_incidencia]);
-    if ($stmt->fetchColumn() === 'cerrada') {
+    if (!in_array((string)$stmt->fetchColumn(), dominio_estados_activos(), true)) {
         header("Location: portal_ver.php?id=" . (int)$id_incidencia);
         exit;
     }
@@ -38,6 +38,10 @@ $stmt->execute([':id' => $id_incidencia]);
 $incidencia = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$incidencia) {
     header('Location: index.php');
+    exit;
+}
+if (!in_array((string)$incidencia['estado'], dominio_estados_activos(), true)) {
+    header("Location: $pagina_detalle?id=" . (int)$id_incidencia);
     exit;
 }
 

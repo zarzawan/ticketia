@@ -21,6 +21,8 @@ $opciones = getopt('', ['lote::', 'bucle', 'reintentar-fallidos']);
 $lote = max(1, (int)($opciones['lote'] ?? 10));
 $bucle = array_key_exists('bucle', $opciones);
 
+$ultimo_mantenimiento = 0;
+
 if (array_key_exists('reintentar-fallidos', $opciones)) {
     $n = trabajos_reintentar_fallidos($pdo);
     echo "[worker] $n trabajos fallidos reencolados\n";
@@ -30,6 +32,18 @@ if (array_key_exists('reintentar-fallidos', $opciones)) {
 }
 
 do {
+    // En modo puntual se ejecuta una vez; en modo servicio, cada hora.
+    if (time() - $ultimo_mantenimiento >= 3600) {
+        $mantenimiento = incidencias_ejecutar_mantenimiento($pdo);
+        $ultimo_mantenimiento = time();
+        if ($mantenimiento['cerradas'] > 0 || $mantenimiento['archivadas'] > 0) {
+            echo sprintf(
+                "[ciclo-vida] cerradas=%d archivadas=%d\n",
+                $mantenimiento['cerradas'],
+                $mantenimiento['archivadas']
+            );
+        }
+    }
     $resumen = trabajos_procesar_lote($pdo, $lote);
     if ($resumen['procesados'] > 0) {
         echo sprintf(

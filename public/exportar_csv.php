@@ -33,6 +33,9 @@ dominio_append_filtros($sql, $params, [
     'hasta' => $filtro_hasta,
     'asignado' => $filtro_asignado
 ]);
+if ($filtro_estado === '') {
+    $sql .= " AND estado IN ('abierta','en_curso')";
+}
 $sql .= ' ORDER BY ' . dominio_order_by($orden);
 
 $stmt = $pdo->prepare($sql);

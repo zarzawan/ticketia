@@ -7,8 +7,9 @@ function ui_e($value): string {
 
 function ui_estado_label(string $estado): string {
     $map = [
-        'abierta' => 'Abierta',
-        'en_curso' => 'En curso',
+        'abierta' => 'Nueva',
+        'en_curso' => 'En trabajo',
+        'resuelta' => 'Solucion propuesta',
         'cerrada' => 'Cerrada'
     ];
 
@@ -97,7 +98,7 @@ function ui_render_kanban_card(array $incidencia, array $asignables = [], bool $
     $sla = dominio_sla_calcular($incidencia);
     $slaClase = ui_e((string)$sla['estado']);
     $slaTexto = ui_e(dominio_duracion_humana((int)$sla['restante_segundos']));
-    $turno = dominio_turno_atencion($incidencia['ultimo_autor'] ?? null, $estado);
+    $turno = dominio_siguiente_paso($incidencia['ultimo_autor'] ?? null, $estado);
     $turnoClase = ui_e($turno['clave']);
     $turnoTexto = ui_e($turno['label']);
     $prioridadInfo = dominio_prioridad_operativa_desglose($incidencia);
@@ -223,6 +224,8 @@ function ui_admin_nav(string $activa): string {
         'admin_inicio.php' => ['Inicio', 'Resumen y alertas', 'IN'],
         'admin_usuarios.php' => ['Usuarios', 'Cuentas y permisos', 'US'],
         'admin_clientes.php' => ['Empresas', 'Clientes del portal', 'EM'],
+        'admin_flujos.php' => ['Flujos', 'Cierre y archivo', 'FL'],
+        'admin_catalogo.php' => ['Catalogo', 'Contexto comercial IA', 'CA'],
         'admin_auditoria.php' => ['Auditoria', 'Registro de actividad', 'AU'],
         'admin_ajustes.php' => ['Ajustes', 'IA y mantenimiento', 'AJ'],
         'ver_logs_llm.php' => ['Actividad IA', 'Consumo y errores', 'IA'],
@@ -245,13 +248,11 @@ function ui_support_nav(string $activa = 'tickets'): string {
     $usuario = auth_usuario();
     $miId = (int)($usuario['id'] ?? 0);
     $items = [
-        ['tickets', 'index.php', 'IN', 'Bandeja', 'Todas las incidencias'],
-        ['nueva', 'index.php#nuevaIncidencia', 'NU', 'Nueva incidencia', 'Crear una solicitud'],
-        ['accion', 'index.php?cola=accion&vista=kanban', 'AC', 'Requieren respuesta', 'Siguiente movimiento'],
-        ['sla', 'index.php?cola=sla&vista=kanban', 'SL', 'SLA en riesgo', 'Prioridad temporal'],
-        ['espera', 'index.php?cola=espera&vista=kanban', 'ES', 'Esperando cliente', 'Pendientes del solicitante'],
-        ['sin_asignar', 'index.php?filtro_asignado=sin_asignar&vista=kanban', 'SA', 'Sin asignar', 'Pendientes de responsable'],
-        ['mios', 'index.php?filtro_asignado=' . $miId . '&vista=kanban', 'MI', 'Mis incidencias', 'Cola personal'],
+        ['tickets', 'index.php', 'IN', 'Bandeja activa', 'Trabajo del equipo'],
+        ['accion', 'index.php?cola=accion', 'AC', 'Para responder', 'Siguiente accion del equipo'],
+        ['mios', 'index.php?filtro_asignado=' . $miId, 'MI', 'Mis incidencias', 'Cola personal'],
+        ['sin_asignar', 'index.php?filtro_asignado=sin_asignar', 'SA', 'Sin asignar', 'Pendientes de responsable'],
+        ['archivo', 'archivo.php', 'HI', 'Historial', 'Cerradas y archivadas'],
         ['analisis', 'analisis.php', 'IA', 'Inteligencia', 'Analisis del backlog'],
     ];
     $html = "<aside class='support-sidebar' id='supportSidebar'>";
@@ -262,7 +263,7 @@ function ui_support_nav(string $activa = 'tickets'): string {
         $actual = $clave === $activa ? " aria-current='page'" : '';
         $html .= "<a class='{$clase}' href='{$url}'{$actual}><span class='support-nav-icon'>{$icono}</span><span><strong>{$titulo}</strong><small>{$detalle}</small></span></a>";
     }
-    $html .= "</nav><div class='support-sidebar-foot'>";
+    $html .= "</nav><div class='support-sidebar-foot'><a class='support-new-link' href='index.php#nuevaIncidencia'>+ Nueva incidencia</a>";
     if (auth_es('admin')) {
         $html .= "<a href='admin_inicio.php'>Centro de administracion</a>";
     }

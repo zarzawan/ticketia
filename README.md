@@ -28,7 +28,10 @@ automatizar el trabajo repetitivo del soporte:
   incidencia y urgencia, avisos de riesgo y bandejas para
   respuesta pendiente, espera del cliente y tickets sin asignar.
 - **Bandeja operativa renovada**: navegación lateral sin accesos duplicados, alta rápida
-  de incidencias, resumen y analítica siempre visibles y listado ordenable en ambos sentidos.
+  de incidencias, prioridades accionables y listado ordenable; el Kanban queda como vista opcional.
+- **Ciclo de vida y archivo**: el equipo propone una solución, el cliente la confirma o
+  rechaza y el sistema cierra y archiva automáticamente según reglas configurables. El
+  histórico queda paginado fuera de la bandeja diaria, sin borrar trazabilidad.
 - **Operaciones en lote**: seleccion multiple en Kanban y lista para cambiar estado o
   responsable sin abrir cada incidencia.
 - 💼 **Recomendación comercial**: cruza tickets comerciales con tu catálogo de productos.
@@ -47,11 +50,11 @@ automatizar el trabajo repetitivo del soporte:
 - ⚙️ **Cola de trabajos IA**: si el proveedor está caído, la clasificación se encola y un
   worker la reintenta con backoff; incluye límite diario de llamadas de pago y modo
   solo-local para coste cero garantizado.
-- 🛡️ **Panel de administración**: usuarios y roles, empresas, auditoría completa y ajustes
-  del sistema con prueba de conexión IA en vivo.
+- 🛡️ **Panel de administración**: usuarios y roles, empresas, auditoría, SLA, reglas de
+  cierre/archivo, catálogo comercial para la IA y ajustes con prueba de conexión en vivo.
 
-Interfaz con panel Kanban (arrastrar y soltar), filtros persistentes, estadísticas
-clicables, cola personal del operador, asignación de técnicos y modo oscuro.
+Interfaz con lista operativa y Kanban opcional, filtros persistentes, cola personal del
+operador, asignación de técnicos, historial separado y modo oscuro.
 
 ## Capturas
 
@@ -122,7 +125,8 @@ Control de coste: `LLM_SOLO_LOCAL=1` ignora los proveedores de pago aunque haya 
 ## Worker de trabajos IA
 
 Las tareas de IA que fallan (proveedor caído, timeout) se encolan y se reintentan con
-backoff. Programa el worker con cron o el Programador de tareas de Windows:
+backoff. El mismo worker aplica el cierre y archivo automáticos. Programa el proceso con
+cron o el Programador de tareas de Windows:
 
 ```bash
 php bin/worker.php            # procesa hasta 10 trabajos y termina

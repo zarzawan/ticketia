@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // desactivada), sus tickets abiertos vuelven a la cola.
                     if (!in_array($rol, ['admin', 'operador'], true) || !$activo) {
                         $desasignadas = $pdo->prepare(
-                            "UPDATE incidencias SET asignado_id = NULL WHERE asignado_id = :id AND estado <> 'cerrada'"
+                            "UPDATE incidencias SET asignado_id = NULL WHERE asignado_id = :id AND estado IN ('abierta','en_curso')"
                         );
                         $desasignadas->execute([':id' => $id]);
                         if ($desasignadas->rowCount() > 0) {
@@ -157,7 +157,7 @@ $filtro_rol = in_array($_GET['rol'] ?? '', $roles_validos, true) ? (string)$_GET
 $filtro_estado = in_array($_GET['estado'] ?? '', ['activos', 'desactivados', 'bloqueados'], true) ? (string)$_GET['estado'] : '';
 
 $sql = "SELECT u.*, c.nombre AS empresa,
-               (SELECT COUNT(*) FROM incidencias i WHERE i.asignado_id = u.id AND i.estado <> 'cerrada') AS tickets_abiertos
+               (SELECT COUNT(*) FROM incidencias i WHERE i.asignado_id = u.id AND i.estado IN ('abierta','en_curso')) AS tickets_abiertos
         FROM usuarios u
         LEFT JOIN clientes c ON c.id = u.cliente_id
         WHERE 1=1";

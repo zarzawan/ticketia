@@ -202,7 +202,12 @@ function correo_notificar_estado(PDO $pdo, int $id_incidencia, string $anterior,
     if (($actor['email'] ?? null) === $t['creador_email']) {
         return;
     }
-    $etiquetas = ['abierta' => 'Abierta', 'en_curso' => 'En curso', 'cerrada' => 'Cerrada'];
+    $etiquetas = [
+        'abierta' => 'Nueva',
+        'en_curso' => 'En trabajo',
+        'resuelta' => 'Solucion propuesta',
+        'cerrada' => 'Cerrada',
+    ];
     $de = $etiquetas[$anterior] ?? $anterior;
     $a = $etiquetas[$nuevo] ?? $nuevo;
     $titulo = htmlspecialchars((string)$t['titulo'], ENT_QUOTES, 'UTF-8');

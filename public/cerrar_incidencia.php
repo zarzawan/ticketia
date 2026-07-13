@@ -7,17 +7,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
-if (!$id_incidencia) {
-    header('Location: index.php?error=1');
+$codigo = trim((string)($_POST['resolucion_codigo'] ?? ''));
+$notas = trim((string)($_POST['resolucion_notas'] ?? ''));
+if (!$id_incidencia || $codigo === '' || $notas === '') {
+    header('Location: ver_incidencia.php?id=' . (int)$id_incidencia . '&resolucion=error');
     exit;
 }
 
-if (!incidencia_cambiar_estado($pdo, $id_incidencia, 'cerrada')) {
-    header('Location: index.php?error=1');
+if (!incidencia_resolver($pdo, $id_incidencia, $codigo, $notas)) {
+    header('Location: ver_incidencia.php?id=' . (int)$id_incidencia . '&resolucion=error');
     exit;
 }
-auditar($pdo, 'cerrar_incidencia', "incidencia #$id_incidencia");
+auditar($pdo, 'resolver_incidencia', "incidencia #$id_incidencia ($codigo)");
 
-// Redirigir de nuevo
-header("Location: ver_incidencia.php?id=" . $id_incidencia);
+header("Location: ver_incidencia.php?id=" . $id_incidencia . '&resolucion=ok');
 exit;

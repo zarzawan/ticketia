@@ -7,7 +7,7 @@
 - Nuevo espacio profesional de soporte con navegacion lateral, cabecera adaptable y una jerarquia comun para bandeja y detalle.
 - Bandeja simplificada sin accesos duplicados: las colas y el alta de incidencias viven en el menu lateral, mientras el resumen y la analitica permanecen visibles sobre los filtros.
 - Colas inteligentes para incidencias que requieren respuesta, SLA en riesgo, espera del cliente y tickets sin asignar.
-- Vista Kanban predeterminada y lista operativa con prioridad explicable, senales de turno, ordenacion ascendente o descendente por columna, seleccion multiple y acciones masivas de estado o asignacion.
+- Lista operativa predeterminada y Kanban opcional, con prioridad explicable, siguiente paso en lenguaje claro, ordenacion por columna, seleccion multiple y acciones masivas seguras.
 - SLA configurables por nivel de cliente, tipo de incidencia y urgencia, con objetivos de primera respuesta y resolucion visibles en tarjetas y detalle.
 - Copiloto IA por incidencia con traduccion, borrador reutilizable y asistencia comercial integrada con el catalogo.
 - Actividad compacta sin repetir descripciones ni mensajes, con enlaces al contenido relacionado.
@@ -17,6 +17,10 @@
 - Navegacion administrativa lateral y adaptable a movil para mantener contexto entre usuarios, empresas, auditoria, ajustes y actividad IA.
 - Portal de cliente renovado con buscador, tarjetas de seguimiento, prioridad, mensajes y fecha de ultima actividad.
 - Mejoras de legibilidad, estados vacios, jerarquia visual y comportamiento responsive en las superficies administrativas y de cliente.
+- Ciclo de vida ITSM con solucion propuesta, confirmacion o rechazo del cliente, cierre automatico configurable y archivo logico paginado.
+- Las incidencias cerradas desaparecen de la bandeja activa y siguen disponibles en un historial separado, indexado y consultable.
+- Administracion ampliada con reglas de ciclo de vida, mantenimiento manual, volumen por fase y gestion del catalogo que usa la IA comercial.
+- Analisis IA limitado al trabajo activo y a un contexto acotado de 60 incidencias para mantener tiempos y consumo previsibles al crecer el historico.
 
 Los cambios relevantes de cada versión. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es/) y el versionado,

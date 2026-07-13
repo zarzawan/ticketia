@@ -67,7 +67,24 @@ function dominio_urgencias(): array {
 }
 
 function dominio_estados(): array {
-    return ['abierta', 'en_curso', 'cerrada'];
+    return ['abierta', 'en_curso', 'resuelta', 'cerrada'];
+}
+
+/** Estados que forman parte del trabajo diario y no del historico. */
+function dominio_estados_activos(): array {
+    return ['abierta', 'en_curso'];
+}
+
+/** Codigos normalizados para explicar como se resolvio una incidencia. */
+function dominio_codigos_resolucion(): array {
+    return [
+        'solucion_permanente' => 'Solucion permanente',
+        'solucion_temporal' => 'Solucion temporal',
+        'duplicada' => 'Duplicada',
+        'no_reproducible' => 'No reproducible',
+        'retirada' => 'Retirada por el solicitante',
+        'otro' => 'Otro',
+    ];
 }
 
 function dominio_ordenes(): array {
@@ -153,11 +170,15 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
     );
     $limiteRespuesta = $creada->modify('+' . $objetivos['primera_respuesta'] . ' hours');
     $limiteResolucion = $creada->modify('+' . $objetivos['resolucion'] . ' hours');
-    $cerrada = (string)($incidencia['estado'] ?? '') === 'cerrada';
+    $estadoIncidencia = (string)($incidencia['estado'] ?? '');
+    $finalizada = in_array($estadoIncidencia, ['resuelta', 'cerrada'], true);
     $referencia = $ahora;
-    if ($cerrada && !empty($incidencia['fecha_cierre'])) {
+    $fechaFinal = $estadoIncidencia === 'resuelta'
+        ? ($incidencia['fecha_resolucion'] ?? null)
+        : ($incidencia['fecha_resolucion'] ?? ($incidencia['fecha_cierre'] ?? null));
+    if ($finalizada && !empty($fechaFinal)) {
         try {
-            $referencia = new DateTimeImmutable((string)$incidencia['fecha_cierre']);
+            $referencia = new DateTimeImmutable((string)$fechaFinal);
         } catch (Exception $e) {
             $referencia = $ahora;
         }
@@ -168,7 +189,7 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
     $porcentajeResolucion = (int)round(($consumidoResolucion / $duracionResolucion) * 100);
     $restanteResolucion = $limiteResolucion->getTimestamp() - $referencia->getTimestamp();
     $estadoResolucion = $referencia > $limiteResolucion ? 'vencido' : ($porcentajeResolucion >= 75 ? 'riesgo' : 'ok');
-    if ($cerrada && $estadoResolucion !== 'vencido') {
+    if ($finalizada && $estadoResolucion !== 'vencido') {
         $estadoResolucion = 'cumplido';
     }
 
@@ -198,7 +219,7 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
         $estado = 'vencido';
     } elseif ($estadoResolucion === 'riesgo' || $estadoRespuesta === 'riesgo') {
         $estado = 'riesgo';
-    } elseif ($cerrada) {
+    } elseif ($finalizada) {
         $estado = 'cumplido';
     } else {
         $estado = 'ok';
@@ -239,15 +260,23 @@ function dominio_duracion_humana(int $segundos): string {
     return $pasado ? 'Vencido hace ' . $texto : $texto . ' restantes';
 }
 
-/** Determina quien debe realizar el siguiente movimiento publico del hilo. */
-function dominio_turno_atencion(?string $ultimo_autor, string $estado): array {
+/** Explica el siguiente paso sin el ambiguo termino historico "turno". */
+function dominio_siguiente_paso(?string $ultimo_autor, string $estado): array {
     if ($estado === 'cerrada') {
-        return ['clave' => 'resuelto', 'label' => 'Resuelto'];
+        return ['clave' => 'resuelto', 'label' => 'Finalizada'];
+    }
+    if ($estado === 'resuelta') {
+        return ['clave' => 'cliente', 'label' => 'Esperando confirmacion'];
     }
     if ($ultimo_autor === 'tecnico') {
         return ['clave' => 'cliente', 'label' => 'Esperando al cliente'];
     }
-    return ['clave' => 'equipo', 'label' => 'Requiere respuesta'];
+    return ['clave' => 'equipo', 'label' => 'Responder ahora'];
+}
+
+/** Alias temporal para integraciones que aun usen el nombre anterior. */
+function dominio_turno_atencion(?string $ultimo_autor, string $estado): array {
+    return dominio_siguiente_paso($ultimo_autor, $estado);
 }
 
 /** Desglose transparente para que la puntuacion operativa sea verificable. */
@@ -268,7 +297,7 @@ function dominio_prioridad_operativa_desglose(array $incidencia, ?DateTimeImmuta
         $puntos += 10;
         $factores[] = ['label' => 'Sin responsable', 'puntos' => 10];
     }
-    if (($incidencia['ultimo_autor'] ?? null) !== 'tecnico' && ($incidencia['estado'] ?? '') !== 'cerrada') {
+    if (($incidencia['ultimo_autor'] ?? null) !== 'tecnico' && in_array(($incidencia['estado'] ?? ''), dominio_estados_activos(), true)) {
         $puntos += 10;
         $factores[] = ['label' => 'Requiere respuesta del equipo', 'puntos' => 10];
     }
@@ -365,9 +394,14 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
         return true;
     }
 
-    $sql = "UPDATE incidencias SET estado = :estado, fecha_cierre = " .
-        ($nuevo_estado === 'cerrada' ? 'NOW()' : 'NULL') .
-        " WHERE id = :id";
+    if ($nuevo_estado === 'cerrada') {
+        $camposFechas = "fecha_cierre = NOW(), fecha_resolucion = COALESCE(fecha_resolucion, NOW())";
+    } elseif ($nuevo_estado === 'resuelta') {
+        $camposFechas = "fecha_cierre = NULL, fecha_resolucion = COALESCE(fecha_resolucion, NOW()), fecha_archivo = NULL";
+    } else {
+        $camposFechas = "fecha_cierre = NULL, fecha_resolucion = NULL, resolucion_codigo = NULL, resolucion_notas = NULL, resuelto_por = NULL, fecha_archivo = NULL";
+    }
+    $sql = "UPDATE incidencias SET estado = :estado, $camposFechas WHERE id = :id";
     $pdo->prepare($sql)->execute([':estado' => $nuevo_estado, ':id' => $id_incidencia]);
 
     $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
@@ -386,6 +420,104 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
     }
 
     return true;
+}
+
+/** Propone una solucion y detiene el SLA a la espera de confirmacion. */
+function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, string $notas): bool {
+    $notas = trim($notas);
+    if (!isset(dominio_codigos_resolucion()[$codigo]) || $notas === '') {
+        return false;
+    }
+
+    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
+    $stmt->execute([':id' => $id_incidencia]);
+    $actual = $stmt->fetchColumn();
+    if ($actual === false || !in_array((string)$actual, dominio_estados_activos(), true)) {
+        return false;
+    }
+
+    $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
+    $pdo->prepare(
+        "UPDATE incidencias
+         SET estado = 'resuelta', fecha_resolucion = NOW(), fecha_cierre = NULL,
+             resolucion_codigo = :codigo, resolucion_notas = :notas,
+             resuelto_por = :usuario, fecha_archivo = NULL
+         WHERE id = :id"
+    )->execute([
+        ':codigo' => $codigo,
+        ':notas' => $notas,
+        ':usuario' => $usuario['id'] ?? null,
+        ':id' => $id_incidencia,
+    ]);
+    $pdo->prepare(
+        "INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
+         VALUES (:id, :usuario, :anterior, 'resuelta')"
+    )->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null, ':anterior' => $actual]);
+
+    if (function_exists('correo_notificar_estado')) {
+        correo_notificar_estado($pdo, $id_incidencia, (string)$actual, 'resuelta');
+    }
+    return true;
+}
+
+/** Lee un ajuste entero con limites seguros y fallback. */
+function dominio_ajuste_entero(PDO $pdo, string $clave, int $porDefecto, int $minimo, int $maximo): int {
+    try {
+        $stmt = $pdo->prepare("SELECT valor FROM ajustes WHERE clave = :clave");
+        $stmt->execute([':clave' => $clave]);
+        $valor = $stmt->fetchColumn();
+        if ($valor !== false && filter_var($valor, FILTER_VALIDATE_INT) !== false) {
+            return max($minimo, min($maximo, (int)$valor));
+        }
+    } catch (Throwable $e) {
+        // Instalaciones aun no migradas conservan un comportamiento seguro.
+    }
+    return $porDefecto;
+}
+
+function dominio_ajuste_guardar_entero(PDO $pdo, string $clave, int $valor): void {
+    $pdo->prepare(
+        "INSERT INTO ajustes (clave, valor) VALUES (:clave, :valor)
+         ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
+    )->execute([':clave' => $clave, ':valor' => (string)$valor]);
+}
+
+/**
+ * Cierra soluciones no rechazadas y archiva cierres antiguos. El archivo es
+ * logico: los datos siguen disponibles en el historico y para la IA.
+ */
+function incidencias_ejecutar_mantenimiento(PDO $pdo): array {
+    $diasCierre = dominio_ajuste_entero($pdo, 'dias_cierre_automatico', 7, 1, 90);
+    $diasArchivo = dominio_ajuste_entero($pdo, 'dias_archivo_automatico', 30, 1, 3650);
+
+    $stmt = $pdo->prepare(
+        "SELECT id FROM incidencias
+         WHERE estado = 'resuelta' AND fecha_resolucion <= NOW() - INTERVAL :dias DAY
+         ORDER BY id LIMIT 500"
+    );
+    $stmt->bindValue(':dias', $diasCierre, PDO::PARAM_INT);
+    $stmt->execute();
+    $idsCierre = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    foreach ($idsCierre as $id) {
+        incidencia_cambiar_estado($pdo, $id, 'cerrada');
+    }
+
+    $stmtArchivo = $pdo->prepare(
+        "UPDATE incidencias
+         SET fecha_archivo = NOW()
+         WHERE estado = 'cerrada' AND fecha_archivo IS NULL
+           AND fecha_cierre <= NOW() - INTERVAL :dias DAY
+         LIMIT 1000"
+    );
+    $stmtArchivo->bindValue(':dias', $diasArchivo, PDO::PARAM_INT);
+    $stmtArchivo->execute();
+
+    return [
+        'cerradas' => count($idsCierre),
+        'archivadas' => $stmtArchivo->rowCount(),
+        'dias_cierre' => $diasCierre,
+        'dias_archivo' => $diasArchivo,
+    ];
 }
 
 /**
