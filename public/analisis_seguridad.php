@@ -514,10 +514,10 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
 <div class="container support-content analysis-workspace">
     <div class="page-shell">
         <div class="page-tools analysis-toolbar">
-            <button class="card-button reload-analisis" title="Generar analisis">Generar analisis</button>
+            <button class="card-button reload-analisis" title="Recargar analisis">Recargar</button>
             <button class="card-button secondary-button copy-resumen" title="Copiar resumen">Copiar</button>
             <button class="card-button secondary-button stop-stream" title="Detener generacion">Detener</button>
-            <span class="status-pill" id="streamStatus">Listo para analizar</span>
+            <span class="status-pill" id="streamStatus">Generando analisis...</span>
             <span class="status-pill" id="streamMetrics">0 caracteres</span>
             <details class="analysis-more-tools"><summary>Mas opciones</summary><div>
                 <button class="card-button secondary-button auto-scroll" type="button">Autoscroll: ON</button>
@@ -529,7 +529,7 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
         <div class="incidencia-box compact-box">
             <h2>Resumen de seguridad generado por IA</h2>
             <div class="analysis-stream pretty" id="resumen-content">
-                <div class="loading" id="loading">Pulsa «Generar analisis» para revisar los riesgos actuales.</div>
+                <div class="loading" id="loading">Generando analisis...</div>
                 <div class="analysis-content markdown-compact" id="resumen-render"></div>
             </div>
         </div>
@@ -631,21 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    let source = null;
-    const streamUrl = <?= json_encode('analisis_seguridad.php?' . http_build_query(array_merge($_GET, ['stream' => 1])), JSON_UNESCAPED_SLASHES) ?>;
-    const iniciarAnalisis = () => {
-        if (source) source.close();
-        rawText = '';
-        streamStoppedByUser = false;
-        loading.style.display = 'block';
-        loading.textContent = 'Analizando riesgos activos...';
-        streamStatus.textContent = 'Generando analisis...';
-        renderPretty();
-        updateMetrics();
-        source = new EventSource(streamUrl);
-        source.onmessage = procesarMensaje;
-        source.onerror = cerrarPorError;
-    };
+    reloadButton.addEventListener('click', () => window.location.reload());
 
     autoScrollButton.addEventListener('click', () => {
         autoScroll = !autoScroll;
@@ -682,18 +668,20 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
+    const source = new EventSource('<?php echo $_SERVER['PHP_SELF']; ?>?stream=1');
+
     if (stopButton) {
         stopButton.addEventListener('click', () => {
             streamStoppedByUser = true;
-            if (source) source.close();
+            source.close();
             loading.style.display = 'none';
             streamStatus.textContent = 'Generacion detenida';
         });
     }
 
-    const procesarMensaje = (event) => {
+    source.onmessage = (event) => {
         if (event.data === '[?? Finalizado correctamente]') {
-            if (source) source.close();
+            source.close();
             loading.style.display = 'none';
             streamStatus.textContent = 'Analisis completado';
             return;
@@ -713,15 +701,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const cerrarPorError = () => {
-        if (source) source.close();
+    source.onerror = () => {
+        source.close();
         loading.style.display = 'none';
         if (!streamStoppedByUser) {
             streamStatus.textContent = 'Conexion cerrada';
         }
     };
 
-    reloadButton.addEventListener('click', iniciarAnalisis);
     updateMetrics();
 });
 </script>
