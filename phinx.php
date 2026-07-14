@@ -4,6 +4,7 @@
 require __DIR__ . '/vendor/autoload.php';
 
 Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+require_once __DIR__ . '/src/entorno.php';
 
 return [
     'paths' => [
@@ -15,11 +16,11 @@ return [
         'default_environment' => 'principal',
         'principal' => [
             'adapter' => 'mysql',
-            'host' => $_ENV['DB_HOST'] ?? 'localhost',
-            'name' => $_ENV['DB_NAME'] ?? 'ticketia',
-            'user' => $_ENV['DB_USER'] ?? 'ticketia',
-            'pass' => $_ENV['DB_PASS'] ?? '',
-            'port' => (int)($_ENV['DB_PORT'] ?? 3306),
+            'host' => entorno_valor('DB_HOST', 'localhost'),
+            'name' => entorno_valor('DB_NAME', 'ticketia'),
+            'user' => entorno_valor('DB_USER', 'ticketia'),
+            'pass' => entorno_valor('DB_PASS', ''),
+            'port' => (int)entorno_valor('DB_PORT', 3306),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
         ],

@@ -103,7 +103,7 @@ $contadores = $pdo->query(
 $extensiones = ['pdo_mysql', 'curl', 'mbstring', 'fileinfo', 'openssl'];
 
 $cola = trabajos_estado($pdo);
-$limite_dia = (int)($_ENV['LLM_MAX_LLAMADAS_DIA'] ?? 0);
+$limite_dia = (int)entorno_valor('LLM_MAX_LLAMADAS_DIA', 0);
 $llamadas_pago_hoy = (int)$pdo->query(
     "SELECT COUNT(*) FROM llm_logs WHERE proveedor <> 'local' AND DATE(fecha) = CURDATE()"
 )->fetchColumn();
@@ -203,6 +203,12 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
                 </strong>
             </div>
             <div class="detail-row"><span>Hash de contrasenas</span><strong><?= defined('PASSWORD_ARGON2ID') ? 'Argon2id' : 'bcrypt' ?></strong></div>
+            <div class="detail-row">
+                <span>Clave de aplicacion</span>
+                <strong class="<?= cuenta_app_key_disponible() ? '' : 'texto-alerta' ?>">
+                    <?= cuenta_app_key_disponible() ? 'Configurada · 2FA disponible' : 'Pendiente · 2FA desactivado' ?>
+                </strong>
+            </div>
             <div class="detail-row"><span>Incidencias</span><strong><?= (int)$contadores['incidencias'] ?></strong></div>
             <div class="detail-row"><span>Mensajes</span><strong><?= (int)$contadores['mensajes'] ?></strong></div>
             <div class="detail-row"><span>Usuarios / Empresas</span><strong><?= (int)$contadores['usuarios'] ?> / <?= (int)$contadores['clientes'] ?></strong></div>

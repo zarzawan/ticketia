@@ -4,6 +4,20 @@
 
 ### Mejorado
 
+- Despliegue Docker autocontenido con extensiones PHP completas, configuracion de
+  produccion, Nginx inmutable, volumen de adjuntos, healthchecks y worker persistente.
+- Configuracion compatible con variables reales del proceso y con `.env`, sin copiar
+  secretos ni configuracion local dentro de las imagenes.
+- Prueba de humo Docker en CI con migraciones, extensiones, worker e inicio de sesion
+  real, ademas de los tests unitarios existentes.
+- Segundo factor TOTP por usuario con secretos cifrados, proteccion contra reutilizacion
+  y ocho codigos de recuperacion de un solo uso.
+- Recuperacion de contrasena por email con respuesta anti-enumeracion, limites de envio,
+  tokens de 30 minutos almacenados como hash y revocacion de sesiones anteriores.
+- Administracion de cuentas ampliada con estado 2FA, retirada segura del segundo factor,
+  envio de enlaces de acceso y revocacion al cambiar roles, estado o contrasena.
+- Edicion de contrasenas con formulario visible, validacion comun y errores controlados;
+  una migracion pendiente se informa en pantalla en lugar de provocar un error fatal.
 - Nuevo espacio profesional de soporte con navegacion lateral, cabecera adaptable y una jerarquia comun para bandeja y detalle.
 - Bandeja simplificada sin accesos duplicados: las colas y el alta de incidencias viven en el menu lateral, mientras el resumen y la analitica permanecen visibles sobre los filtros.
 - Colas inteligentes para incidencias que requieren respuesta, SLA en riesgo, espera del cliente y tickets sin asignar.

@@ -12,7 +12,9 @@ require TICKETIA_RAIZ . '/vendor/autoload.php';
 // en ese caso valen las variables de entorno reales del sistema).
 Dotenv\Dotenv::createImmutable(TICKETIA_RAIZ)->safeLoad();
 
+require __DIR__ . '/entorno.php';
 require __DIR__ . '/config.php';
+require __DIR__ . '/seguridad_cuenta.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/dominio.php';
 require __DIR__ . '/ui.php';
@@ -21,6 +23,7 @@ require __DIR__ . '/llm.php';
 require __DIR__ . '/clasificacion.php';
 require __DIR__ . '/adjuntos.php';
 require __DIR__ . '/correo.php';
+require __DIR__ . '/cuentas.php';
 require __DIR__ . '/trabajos.php';
 
 // Una sola lectura por peticion. Si la migracion SLA aun no se ha aplicado,
@@ -33,11 +36,12 @@ dominio_sla_cargar_politicas($pdo);
 // ---------------------------------------------------------------------------
 
 auth_sesion_iniciar();
+auth_validar_sesion($pdo);
 seguridad_cabeceras();
 
 if (PHP_SAPI !== 'cli') {
     $pagina_actual = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    $paginas_publicas = ['login.php'];
+    $paginas_publicas = ['login.php', 'verificar_2fa.php', 'solicitar_recuperacion.php', 'restablecer_contrasena.php'];
 
     if (!in_array($pagina_actual, $paginas_publicas, true)) {
         auth_requerir_login();
@@ -54,7 +58,7 @@ if (PHP_SAPI !== 'cli') {
         // El rol cliente solo accede a su portal y a los endpoints que este
         // usa; cualquier otra pagina lo devuelve al portal. La comprobacion
         // de propiedad del ticket la hace cada endpoint.
-        $paginas_cliente = ['portal.php', 'portal_ver.php', 'guardar_incidencia.php', 'guardar_mensaje.php', 'subir_adjunto.php', 'descargar_adjunto.php', 'confirmar_resolucion.php', 'logout.php'];
+        $paginas_cliente = ['portal.php', 'portal_ver.php', 'mi_cuenta.php', 'guardar_incidencia.php', 'guardar_mensaje.php', 'subir_adjunto.php', 'descargar_adjunto.php', 'confirmar_resolucion.php', 'logout.php'];
         if (auth_es('cliente') && !in_array($pagina_actual, $paginas_cliente, true)) {
             header('Location: portal.php');
             exit;

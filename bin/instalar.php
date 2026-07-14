@@ -18,8 +18,8 @@ echo "== Instalador de TicketIA ==\n\n";
 
 // 1. Requisitos
 $fallos = [];
-if (version_compare(PHP_VERSION, '8.1.0', '<')) {
-    $fallos[] = 'Se requiere PHP 8.1 o superior (tienes ' . PHP_VERSION . ')';
+if (version_compare(PHP_VERSION, '8.2.0', '<')) {
+    $fallos[] = 'Se requiere PHP 8.2 o superior (tienes ' . PHP_VERSION . ')';
 }
 foreach (['pdo_mysql', 'curl', 'mbstring'] as $ext) {
     if (!extension_loaded($ext)) {
@@ -39,7 +39,7 @@ if ($fallos) {
 echo "[ok] Requisitos de PHP\n";
 
 // 2. Configuracion
-if (!is_file("$raiz/.env")) {
+if (!is_file("$raiz/.env") && getenv('DB_HOST') === false) {
     if (is_file("$raiz/.env.example")) {
         copy("$raiz/.env.example", "$raiz/.env");
         echo "[!] No existia .env: se ha creado a partir de .env.example.\n";
@@ -52,28 +52,40 @@ if (!is_file("$raiz/.env")) {
 
 require "$raiz/vendor/autoload.php";
 Dotenv\Dotenv::createImmutable($raiz)->safeLoad();
+require_once "$raiz/src/entorno.php";
 
-$host = $_ENV['DB_HOST'] ?? 'localhost';
-$port = $_ENV['DB_PORT'] ?? '3306';
-$name = $_ENV['DB_NAME'] ?? 'ticketia';
-$user = $_ENV['DB_USER'] ?? 'ticketia';
-$pass = $_ENV['DB_PASS'] ?? '';
+$host = (string)entorno_valor('DB_HOST', 'localhost');
+$port = (string)entorno_valor('DB_PORT', '3306');
+$name = (string)entorno_valor('DB_NAME', 'ticketia');
+$user = (string)entorno_valor('DB_USER', 'ticketia');
+$pass = (string)entorno_valor('DB_PASS', '');
 
 echo "[ok] Configuracion leida (BD '$name' en $host:$port)\n";
 
-// 3. Conexion al servidor y creacion de la BD si falta
+// 3. Conexion a la BD; crearla solo cuando aun no exista. Esto permite usar
+// usuarios limitados de contenedor que tienen permisos sobre su BD, pero no
+// permisos globales para CREATE DATABASE.
+$nombreSeguro = str_replace('`', '', $name);
 try {
-    $servidor = new PDO("mysql:host=$host;port=$port;charset=utf8mb4", $user, $pass, [
+    $bd = new PDO("mysql:host=$host;port=$port;dbname=$nombreSeguro;charset=utf8mb4", $user, $pass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
 } catch (PDOException $e) {
-    echo "No se pudo conectar al servidor de base de datos: " . $e->getMessage() . "\n";
-    echo "Revisa DB_HOST/DB_PORT/DB_USER/DB_PASS en .env\n";
-    exit(1);
+    try {
+        $servidor = new PDO("mysql:host=$host;port=$port;charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
+        $servidor->exec("CREATE DATABASE IF NOT EXISTS `$nombreSeguro` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $bd = new PDO("mysql:host=$host;port=$port;dbname=$nombreSeguro;charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
+    } catch (PDOException $creacionError) {
+        echo "No se pudo conectar a la base de datos: " . $creacionError->getMessage() . "\n";
+        echo "Revisa DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS en .env o en el entorno.\n";
+        exit(1);
+    }
 }
 
-$nombreSeguro = str_replace('`', '', $name);
-$servidor->exec("CREATE DATABASE IF NOT EXISTS `$nombreSeguro` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 echo "[ok] Base de datos disponible\n";
 
 // 4. Migraciones
@@ -96,10 +108,6 @@ if ($conDemo) {
 
 // 6. Administrador inicial (solo si no existe ningun usuario).
 //    Opciones: --admin-email=correo --admin-pass=contrasena
-$bd = new PDO("mysql:host=$host;port=$port;dbname=$nombreSeguro;charset=utf8mb4", $user, $pass, [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-]);
-
 $totalUsuarios = (int)$bd->query("SELECT COUNT(*) FROM usuarios")->fetchColumn();
 if ($totalUsuarios === 0) {
     $adminEmail = 'admin@ticketia.local';

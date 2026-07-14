@@ -8,7 +8,9 @@ if (auth_usuario() !== null) {
 }
 
 $error = '';
+$volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    unset($_SESSION['auth_2fa_pendiente']);
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -27,11 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $destino);
             exit;
         }
+        if (!empty($resultado['requiere_2fa'])) {
+            $_SESSION['auth_2fa_pendiente']['volver'] = $volver_param;
+            header('Location: verificar_2fa.php');
+            exit;
+        }
         $error = (string)$resultado['error'];
     }
 }
-
-$volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -69,7 +74,7 @@ $volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
             <input type="submit" value="Entrar" class="login-boton">
         </form>
 
-        <p class="help-line login-pie">Si has olvidado tu contrasena, contacta con un administrador.</p>
+        <p class="help-line login-pie"><a href="solicitar_recuperacion.php">He olvidado mi contrasena</a></p>
     </div>
 </div>
 </body>

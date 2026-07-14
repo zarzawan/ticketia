@@ -311,7 +311,7 @@ class LLMHttpClient {
         if (($this->provider['id'] ?? '') === 'local') {
             return false;
         }
-        $limite = (int)($_ENV['LLM_MAX_LLAMADAS_DIA'] ?? 0);
+        $limite = (int)entorno_valor('LLM_MAX_LLAMADAS_DIA', 0);
         if ($limite <= 0) {
             return false;
         }

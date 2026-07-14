@@ -78,10 +78,10 @@ operador, asignación de técnicos, historial separado y modo oscuro.
 ```bash
 git clone https://github.com/zarzawan/ticketia.git
 cd ticketia
-cp .env.example .env          # ajusta la IA si quieres usarla
-docker compose up -d
-docker compose exec php composer install
+cp .env.example .env          # cambia DB_PASS y DB_ROOT_PASS
+docker compose up -d --build db php nginx
 docker compose exec php php bin/instalar.php --con-demo
+docker compose up -d worker
 ```
 
 Abre **http://localhost:8080** — el instalador habrá creado el usuario administrador
@@ -89,6 +89,19 @@ Abre **http://localhost:8080** — el instalador habrá creado el usuario admini
 `--admin-email=... --admin-pass=...` para elegirla) y tendrás el panel con datos de
 demostración. Desde **Usuarios** puedes crear el resto de cuentas (admin, operador,
 comercial, cliente).
+
+Las imágenes ya contienen Composer, dependencias PHP y los archivos públicos. El código
+no se monta desde el equipo anfitrión: solo persisten la base de datos y los adjuntos en
+volúmenes. Para actualizar, ejecuta `git pull` y vuelve a lanzar
+`docker compose up -d --build`.
+
+Mailpit está disponible como perfil opcional de desarrollo con
+`docker compose --profile dev up -d mailpit` y abre su interfaz en
+**http://localhost:8025**.
+
+> Antes de exponer TicketIA fuera de tu equipo, sustituye todas las contraseñas de
+> `.env`, configura `APP_URL` con la URL pública y prepara copias de seguridad de los
+> volúmenes `datos_db` y `adjuntos`.
 
 > Para usar tu IA local desde Docker, en `.env` usa
 > `LLM_LOCAL_ENDPOINT=http://host.docker.internal:1234/v1/chat/completions`.
@@ -99,7 +112,7 @@ comercial, cliente).
 git clone https://github.com/zarzawan/ticketia.git
 cd ticketia
 composer install
-cp .env.example .env          # configura tu base de datos y la IA
+cp .env.example .env          # configura la BD, APP_URL y la IA
 php bin/instalar.php --con-demo
 ```
 
@@ -133,10 +146,27 @@ php bin/worker.php            # procesa hasta 10 trabajos y termina
 php bin/worker.php --bucle    # en bucle continuo (servicio)
 ```
 
+En Docker, el servicio `worker` ejecuta el bucle de forma permanente y se recupera de
+reinicios. Se inicia después del instalador con `docker compose up -d worker`.
+
 ## Notificaciones por email (opcional)
 
 Configura `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` y `APP_URL` en `.env` (ver
 `.env.example`). Sin SMTP configurado no se envía nada y todo funciona igual.
+
+## Seguridad de acceso
+
+Cada usuario puede activar TOTP desde **Mi cuenta** y recibe ocho códigos de recuperación
+de un solo uso. Antes de habilitarlo, genera una clave única y guárdala como `APP_KEY` en
+`.env`:
+
+```bash
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+```
+
+No cambies esa clave después de activar 2FA: protege los secretos cifrados almacenados en
+la base de datos. La recuperación de contraseña utiliza SMTP, enlaces de 30 minutos,
+tokens almacenados como hash y revocación de las sesiones anteriores.
 
 ## Tests
 
@@ -144,14 +174,15 @@ Configura `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` y `APP_URL` en `.env` (ver
 vendor/bin/phpunit
 ```
 
-La CI de GitHub Actions ejecuta lint, tests (PHP 8.2–8.3), escaneo de secretos y el build
-de la imagen Docker en cada push y pull request.
+La CI de GitHub Actions ejecuta lint, tests (PHP 8.2–8.3), escaneo de secretos y una
+prueba de humo Docker completa: levanta la pila, comprueba extensiones, instala el
+esquema, inicia el worker y valida un inicio de sesión real.
 
 ## Hoja de ruta hacia v1.0
 
 - [x] Núcleo de tickets + IA (POC endurecida)
 - [x] Instalador, migraciones, Docker, datos de demo
-- [x] Autenticación, roles, CSRF y auditoría (2FA y recuperación por email, pendientes)
+- [x] Autenticación, roles, CSRF, auditoría, 2FA y recuperación por email
 - [x] Multicliente y adjuntos
 - [x] Portal de cliente con notificaciones email
 - [x] Panel de administración
@@ -159,8 +190,7 @@ de la imagen Docker en cada push y pull request.
 - [x] Tests + CI
 - [x] Release v1.0 y repositorio público
 
-Post-v1: email-to-ticket, búsqueda semántica con embeddings,
-SLA con alertas, API REST, 2FA TOTP y recuperación de contraseña por email.
+Post-v1: email-to-ticket, búsqueda semántica con embeddings, SLA con alertas y API REST.
 
 ## Contribuir
 

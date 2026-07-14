@@ -168,6 +168,7 @@ function ui_menu_usuario(): string {
             <span class='kanban-avatar'>{$iniciales}</span>
             <span>{$nombre} <span class='usuario-rol'>· {$rol}</span></span>
             {$admin}
+            <a href='mi_cuenta.php' title='Seguridad de mi cuenta'>Mi cuenta</a>
             <a href='logout.php' title='Cerrar sesion'>Salir</a>
         </span>
     ";

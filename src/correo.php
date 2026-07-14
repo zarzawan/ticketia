@@ -9,12 +9,12 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 /** true si hay servidor SMTP configurado en el entorno. */
 function correo_activo(): bool {
-    return trim((string)($_ENV['SMTP_HOST'] ?? '')) !== '';
+    return trim((string)entorno_valor('SMTP_HOST', '')) !== '';
 }
 
 /** URL base publica de la aplicacion (para los enlaces de los correos). */
 function correo_url_base(): string {
-    $base = trim((string)($_ENV['APP_URL'] ?? ''));
+    $base = trim((string)entorno_valor('APP_URL', ''));
     return $base !== '' ? rtrim($base, '/') : '';
 }
 
@@ -32,18 +32,18 @@ function correo_enviar(array $destinatarios, string $asunto, string $html): bool
         $mail = new PHPMailer(true);
         $mail->isSMTP();
         $mail->CharSet = 'UTF-8';
-        $mail->Host = (string)$_ENV['SMTP_HOST'];
-        $mail->Port = (int)($_ENV['SMTP_PORT'] ?? 587);
+        $mail->Host = (string)entorno_valor('SMTP_HOST', '');
+        $mail->Port = (int)entorno_valor('SMTP_PORT', 587);
         $mail->Timeout = 10;
 
-        $usuario = trim((string)($_ENV['SMTP_USER'] ?? ''));
+        $usuario = trim((string)entorno_valor('SMTP_USER', ''));
         if ($usuario !== '') {
             $mail->SMTPAuth = true;
             $mail->Username = $usuario;
-            $mail->Password = (string)($_ENV['SMTP_PASS'] ?? '');
+            $mail->Password = (string)entorno_valor('SMTP_PASS', '');
         }
 
-        $seguridad = strtolower(trim((string)($_ENV['SMTP_SECURE'] ?? 'tls')));
+        $seguridad = strtolower(trim((string)entorno_valor('SMTP_SECURE', 'tls')));
         if ($seguridad === 'ssl') {
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
         } elseif ($seguridad === 'tls') {
@@ -53,8 +53,8 @@ function correo_enviar(array $destinatarios, string $asunto, string $html): bool
             $mail->SMTPAutoTLS = false;
         }
 
-        $desde = trim((string)($_ENV['SMTP_FROM'] ?? '')) ?: 'ticketia@localhost';
-        $mail->setFrom($desde, trim((string)($_ENV['SMTP_FROM_NAME'] ?? '')) ?: 'TicketIA');
+        $desde = trim((string)entorno_valor('SMTP_FROM', '')) ?: 'ticketia@localhost';
+        $mail->setFrom($desde, trim((string)entorno_valor('SMTP_FROM_NAME', '')) ?: 'TicketIA');
 
         $enviados = 0;
         foreach ($destinatarios as $destinatario) {

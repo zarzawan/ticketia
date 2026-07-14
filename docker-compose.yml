@@ -1,46 +1,80 @@
-# TicketIA — entorno completo con Docker
+# TicketIA autocontenido con PHP-FPM, nginx, MariaDB y worker.
 #
-#   docker compose up -d
+#   cp .env.example .env
+#   docker compose up -d --build db php nginx
 #   docker compose exec php php bin/instalar.php --con-demo
-#   abrir http://localhost:8080
-#
-# Nota: para usar IA local (LM Studio/Ollama) ejecutandose en tu maquina,
-# usa host.docker.internal en LLM_LOCAL_ENDPOINT dentro de .env.
+#   docker compose up -d worker
+
+x-ticketia-environment: &ticketia-environment
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: ${DB_NAME:-ticketia}
+  DB_USER: ${DB_USER:-ticketia}
+  DB_PASS: ${DB_PASS:-ticketia_dev}
 
 services:
   php:
+    image: ticketia-php:local
     build:
       context: .
       dockerfile: docker/Dockerfile
+    env_file:
+      - .env
+    environment: *ticketia-environment
     volumes:
-      - .:/var/www/ticketia
-    environment:
-      DB_HOST: db
-      DB_PORT: "3306"
-      DB_NAME: ticketia
-      DB_USER: ticketia
-      DB_PASS: ticketia
+      - adjuntos:/var/www/ticketia/almacen
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(extension_loaded('pdo_mysql') && extension_loaded('curl') && extension_loaded('mbstring') && extension_loaded('fileinfo') ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    image: ticketia-php:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: ["php", "bin/worker.php", "--bucle"]
+    env_file:
+      - .env
+    environment: *ticketia-environment
+    volumes:
+      - adjuntos:/var/www/ticketia/almacen
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
 
   nginx:
-    image: nginx:1.27-alpine
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
     ports:
-      - "8080:80"
-    volumes:
-      - .:/var/www/ticketia:ro
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - "${APP_PORT:-8080}:80"
     depends_on:
-      - php
+      php:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/login.php || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
 
   db:
     image: mariadb:10.11
     environment:
-      MARIADB_DATABASE: ticketia
-      MARIADB_USER: ticketia
-      MARIADB_PASSWORD: ticketia
-      MARIADB_ROOT_PASSWORD: ticketia-root
+      MARIADB_DATABASE: ${DB_NAME:-ticketia}
+      MARIADB_USER: ${DB_USER:-ticketia}
+      MARIADB_PASSWORD: ${DB_PASS:-ticketia_dev}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS:-ticketia_root_dev}
     volumes:
       - datos_db:/var/lib/mysql
     healthcheck:
@@ -48,12 +82,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+      start_period: 10s
+    restart: unless-stopped
 
-  # Servidor SMTP de pruebas: captura los correos en http://localhost:8025
   mailpit:
     image: axllent/mailpit:latest
+    profiles: ["dev"]
     ports:
       - "8025:8025"
+    restart: unless-stopped
 
 volumes:
+  adjuntos:
   datos_db:

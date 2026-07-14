@@ -35,12 +35,14 @@ do {
     // En modo puntual se ejecuta una vez; en modo servicio, cada hora.
     if (time() - $ultimo_mantenimiento >= 3600) {
         $mantenimiento = incidencias_ejecutar_mantenimiento($pdo);
+        $tokens_limpiados = cuenta_seguridad_mantenimiento($pdo);
         $ultimo_mantenimiento = time();
-        if ($mantenimiento['cerradas'] > 0 || $mantenimiento['archivadas'] > 0) {
+        if ($mantenimiento['cerradas'] > 0 || $mantenimiento['archivadas'] > 0 || $tokens_limpiados > 0) {
             echo sprintf(
-                "[ciclo-vida] cerradas=%d archivadas=%d\n",
+                "[mantenimiento] cerradas=%d archivadas=%d tokens=%d\n",
                 $mantenimiento['cerradas'],
-                $mantenimiento['archivadas']
+                $mantenimiento['archivadas'],
+                $tokens_limpiados
             );
         }
     }

@@ -1,0 +1,10 @@
+.git
+.github
+.env
+.phpunit.cache
+AGENTS.local.md
+almacen/
+docs/
+tests/
+vendor/
+*.log

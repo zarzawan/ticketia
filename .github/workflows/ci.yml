@@ -50,9 +50,57 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
-    name: Build de la imagen Docker
+    name: Smoke test Docker
     runs-on: ubuntu-latest
+    env:
+      APP_PORT: "8080"
+      DB_PASS: ticketia_ci_2026
+      DB_ROOT_PASS: ticketia_root_ci_2026
     steps:
       - uses: actions/checkout@v4
-      - name: Construir imagen
-        run: docker build -f docker/Dockerfile -t ticketia:ci .
+
+      - name: Preparar configuracion desechable
+        run: cp .env.example .env
+
+      - name: Construir imagenes
+        run: docker compose build
+
+      - name: Arrancar aplicacion
+        run: docker compose up -d --wait db php nginx
+
+      - name: Comprobar extensiones PHP
+        run: |
+          docker compose exec -T php php -r '
+            $requeridas = ["pdo_mysql", "curl", "mbstring", "fileinfo"];
+            $faltan = array_values(array_filter($requeridas, fn($ext) => !extension_loaded($ext)));
+            if ($faltan) { fwrite(STDERR, "Faltan: " . implode(", ", $faltan) . "\n"); exit(1); }
+          '
+
+      - name: Instalar esquema sin datos de demo
+        run: docker compose exec -T php php bin/instalar.php --admin-email=ci@ticketia.test --admin-pass=TicketIA-ci-2026
+
+      - name: Arrancar worker
+        run: docker compose up -d --wait worker
+
+      - name: Probar login por HTTP
+        run: |
+          jar="$(mktemp)"
+          html="$(curl --fail --retry 10 --retry-all-errors -sS -c "$jar" http://127.0.0.1:8080/login.php)"
+          csrf="$(printf '%s' "$html" | sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' | head -1)"
+          test -n "$csrf"
+          codigo="$(curl -sS -o /dev/null -w '%{http_code}' -b "$jar" -c "$jar" \
+            --data-urlencode 'email=ci@ticketia.test' \
+            --data-urlencode 'password=TicketIA-ci-2026' \
+            --data-urlencode "csrf=$csrf" \
+            http://127.0.0.1:8080/login.php)"
+          test "$codigo" = "302"
+
+      - name: Diagnostico de contenedores
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color
+
+      - name: Limpiar stack
+        if: always()
+        run: docker compose down -v --remove-orphans

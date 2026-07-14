@@ -26,6 +26,31 @@ function auth_usuario(): ?array {
     return $_SESSION['usuario'] ?? null;
 }
 
+/** Refresca permisos y revoca sesiones anteriores cuando cambia la cuenta. */
+function auth_validar_sesion(PDO $pdo): void {
+    $actual = auth_usuario();
+    if ($actual === null) {
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT id, nombre, email, rol, cliente_id, activo, sesion_version
+             FROM usuarios WHERE id = :id"
+        );
+        $stmt->execute([':id' => $actual['id']]);
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // Compatibilidad durante el despliegue, antes de aplicar la migracion.
+        return;
+    }
+    if (!$usuario || !(int)$usuario['activo']
+        || (int)$usuario['sesion_version'] !== (int)($actual['sesion_version'] ?? 1)) {
+        unset($_SESSION['usuario']);
+        return;
+    }
+    $_SESSION['usuario'] = auth_datos_sesion($usuario);
+}
+
 function auth_es(string ...$roles): bool {
     $usuario = auth_usuario();
     return $usuario !== null && in_array($usuario['rol'], $roles, true);
@@ -66,7 +91,7 @@ function auth_requerir_rol(string ...$roles): void {
 }
 
 /**
- * Intenta iniciar sesion. Devuelve ['ok' => bool, 'error' => string|null].
+ * Intenta iniciar sesion. Puede exigir un segundo paso TOTP.
  * Bloquea la cuenta tras AUTH_MAX_INTENTOS fallos consecutivos.
  */
 function auth_login(PDO $pdo, string $email, string $password): array {
@@ -103,19 +128,85 @@ function auth_login(PDO $pdo, string $email, string $password): array {
         $pdo->prepare("UPDATE usuarios SET hash_password = :h WHERE id = :id")
             ->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $usuario['id']]);
     }
-    $pdo->prepare("UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_acceso = NOW() WHERE id = :id")
-        ->execute([':id' => $usuario['id']]);
+    if (!empty($usuario['totp_activado_en']) && !empty($usuario['totp_secreto_cifrado'])) {
+        session_regenerate_id(true);
+        unset($_SESSION['usuario']);
+        $_SESSION['auth_2fa_pendiente'] = [
+            'usuario_id' => (int)$usuario['id'],
+            'creado_en' => time(),
+            'intentos' => 0,
+        ];
+        auditar($pdo, 'login_password_2fa', 'usuario #' . (int)$usuario['id']);
+        return ['ok' => false, 'requiere_2fa' => true, 'error' => null];
+    }
 
-    session_regenerate_id(true);
-    $_SESSION['usuario'] = [
+    auth_completar_login($pdo, $usuario);
+    return ['ok' => true, 'requiere_2fa' => false, 'error' => null];
+}
+
+function auth_datos_sesion(array $usuario): array {
+    return [
         'id' => (int)$usuario['id'],
-        'nombre' => $usuario['nombre'],
-        'email' => $usuario['email'],
-        'rol' => $usuario['rol'],
+        'nombre' => (string)$usuario['nombre'],
+        'email' => (string)$usuario['email'],
+        'rol' => (string)$usuario['rol'],
         'cliente_id' => $usuario['cliente_id'] !== null ? (int)$usuario['cliente_id'] : null,
+        'sesion_version' => (int)($usuario['sesion_version'] ?? 1),
     ];
-    auditar($pdo, 'login', '');
+}
 
+function auth_completar_login(PDO $pdo, array $usuario): void {
+    $pdo->prepare(
+        "UPDATE usuarios
+         SET ultimo_acceso = NOW(), intentos_fallidos = 0, bloqueado_hasta = NULL
+         WHERE id = :id"
+    )
+        ->execute([':id' => $usuario['id']]);
+    session_regenerate_id(true);
+    unset($_SESSION['auth_2fa_pendiente']);
+    $_SESSION['usuario'] = auth_datos_sesion($usuario);
+    auditar($pdo, 'login', '');
+}
+
+function auth_2fa_pendiente(): ?array {
+    $pendiente = $_SESSION['auth_2fa_pendiente'] ?? null;
+    if (!is_array($pendiente) || (int)($pendiente['creado_en'] ?? 0) < time() - 300) {
+        unset($_SESSION['auth_2fa_pendiente']);
+        return null;
+    }
+    return $pendiente;
+}
+
+/** @return array{ok: bool, error: ?string} */
+function auth_2fa_verificar(PDO $pdo, string $codigo): array {
+    $pendiente = auth_2fa_pendiente();
+    if ($pendiente === null) {
+        return ['ok' => false, 'error' => 'La verificacion ha caducado. Inicia sesion de nuevo.'];
+    }
+    $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = :id AND activo = 1");
+    $stmt->execute([':id' => $pendiente['usuario_id']]);
+    $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$usuario || empty($usuario['totp_activado_en']) || !cuenta_2fa_consumir_codigo($pdo, $usuario, $codigo)) {
+        $intentos = max((int)($pendiente['intentos'] ?? 0), (int)($usuario['intentos_fallidos'] ?? 0)) + 1;
+        if ($usuario) {
+            $bloqueo = $intentos >= AUTH_MAX_INTENTOS
+                ? date('Y-m-d H:i:s', time() + AUTH_MINUTOS_BLOQUEO * 60)
+                : null;
+            $pdo->prepare(
+                "UPDATE usuarios SET intentos_fallidos = :intentos, bloqueado_hasta = :bloqueo WHERE id = :id"
+            )->execute([':intentos' => $intentos, ':bloqueo' => $bloqueo, ':id' => $pendiente['usuario_id']]);
+        }
+        if ($intentos >= AUTH_MAX_INTENTOS) {
+            unset($_SESSION['auth_2fa_pendiente']);
+            auditar($pdo, 'login_2fa_bloqueado', 'usuario #' . (int)$pendiente['usuario_id']);
+            return ['ok' => false, 'error' => 'Demasiados intentos. Inicia sesion de nuevo.'];
+        }
+        $_SESSION['auth_2fa_pendiente']['intentos'] = $intentos;
+        auditar($pdo, 'login_2fa_fallido', 'usuario #' . (int)$pendiente['usuario_id']);
+        return ['ok' => false, 'error' => 'Codigo incorrecto o ya utilizado.'];
+    }
+
+    auth_completar_login($pdo, $usuario);
     return ['ok' => true, 'error' => null];
 }
 
@@ -208,5 +299,9 @@ function seguridad_cabeceras(): void {
     header('X-Frame-Options: SAMEORIGIN');
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: same-origin');
+    $pagina = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (in_array($pagina, ['login.php', 'verificar_2fa.php', 'solicitar_recuperacion.php', 'restablecer_contrasena.php', 'mi_cuenta.php'], true)) {
+        header('Cache-Control: no-store');
+    }
     header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'");
 }
