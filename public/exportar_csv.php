@@ -35,7 +35,7 @@ dominio_append_filtros($sql, $params, [
     'asignado' => $filtro_asignado
 ]);
 if ($filtro_estado === '') {
-    $sql .= " AND estado IN ('abierta','en_curso')";
+    $sql .= " AND estado IN ('abierta','en_curso','esperando_cliente')";
 }
 bandeja_append_cola($sql, (string)($_GET['cola'] ?? ''));
 $sql .= ' ORDER BY ' . bandeja_orden_sql((string)($_GET['orden_columna'] ?? ''), (string)($_GET['direccion'] ?? 'desc'), $orden);

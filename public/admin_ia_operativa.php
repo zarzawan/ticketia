@@ -23,7 +23,7 @@ try {
         $contexto = ['titulo'=>$titulo,'contenido'=>$contenido]; $ambito = 'plantilla';
     } elseif ($modo === 'reparto') {
         $contexto = ['departamentos'=>$pdo->query("SELECT tipo,COUNT(*) AS activas,SUM(asignado_id IS NULL) AS sin_asignar
-            FROM incidencias WHERE estado IN ('abierta','en_curso') GROUP BY tipo ORDER BY activas DESC LIMIT 25")->fetchAll(PDO::FETCH_ASSOC),
+            FROM incidencias WHERE estado IN ('abierta','en_curso','esperando_cliente') GROUP BY tipo ORDER BY activas DESC LIMIT 25")->fetchAll(PDO::FETCH_ASSOC),
             'tecnicos_activos'=>count(usuarios_asignables($pdo))];
         if (reglas_disponibles($pdo)) {
             $contexto['equipos'] = (int)$pdo->query('SELECT COUNT(*) FROM equipos_soporte')->fetchColumn();

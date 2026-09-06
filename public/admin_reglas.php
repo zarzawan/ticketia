@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$regla) throw new RuntimeException('Regla no encontrada.');
             $huella = hash('sha256', json_encode($regla));
             if ($accion === 'simular') {
-                $stmt = $pdo->prepare("SELECT id,titulo FROM incidencias WHERE estado IN ('abierta','en_curso') AND asignado_id IS NULL
+                $stmt = $pdo->prepare("SELECT id,titulo FROM incidencias WHERE estado IN ('abierta','en_curso','esperando_cliente') AND asignado_id IS NULL
                     AND (:todos = 1 OR cliente_id = :cliente) AND (:tipos = 1 OR tipo = :tipo) ORDER BY id DESC LIMIT 21");
                 $stmt->execute([':todos' => empty($regla['cliente_id']) ? 1 : 0, ':cliente' => $regla['cliente_id'], ':tipos' => $regla['tipo'] === '' ? 1 : 0, ':tipo' => $regla['tipo']]);
                 $simulacion = ['tickets' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'tecnico' => reglas_candidato($pdo, (int)$regla['equipo_id'])];

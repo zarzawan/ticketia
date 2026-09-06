@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
 $nuevo_estado = isset($_POST['estado']) ? trim((string)$_POST['estado']) : '';
 
-$estados_validos = dominio_estados_activos();
+$estados_validos = ['abierta','en_curso']; // La espera requiere enviar una peticion de informacion.
 
 if (!$id_incidencia || !in_array($nuevo_estado, $estados_validos, true)) {
     http_response_code(400);
@@ -20,7 +20,7 @@ if (!$id_incidencia || !in_array($nuevo_estado, $estados_validos, true)) {
     exit;
 }
 
-if (!incidencia_cambiar_estado($pdo, $id_incidencia, $nuevo_estado)) {
+if (!incidencia_cambiar_estado($pdo, $id_incidencia, $nuevo_estado, dominio_estados_activos())) {
     http_response_code(404);
     echo json_encode(['ok' => false, 'error' => 'Incidencia no encontrada']);
     exit;

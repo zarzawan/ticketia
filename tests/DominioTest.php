@@ -7,8 +7,8 @@ final class DominioTest extends TestCase
     public function testCatalogosBasicos(): void
     {
         $this->assertSame(['critico', 'urgente', 'leve'], dominio_urgencias());
-        $this->assertSame(['abierta', 'en_curso', 'resuelta', 'cerrada'], dominio_estados());
-        $this->assertSame(['abierta', 'en_curso'], dominio_estados_activos());
+        $this->assertSame(['abierta', 'en_curso', 'esperando_cliente', 'resuelta', 'cerrada'], dominio_estados());
+        $this->assertSame(['abierta', 'en_curso', 'esperando_cliente'], dominio_estados_activos());
         $this->assertSame('Solucion permanente', dominio_codigos_resolucion()['solucion_permanente']);
         $this->assertContains('id_desc', dominio_ordenes());
         $this->assertNotEmpty(dominio_tipos());
@@ -125,7 +125,8 @@ final class DominioTest extends TestCase
     public function testSiguientePasoYPrioridadOperativaSonExplicables(): void
     {
         $this->assertSame('Responder ahora', dominio_siguiente_paso('cliente', 'en_curso')['label']);
-        $this->assertSame('Esperando al cliente', dominio_siguiente_paso('tecnico', 'en_curso')['label']);
+        $this->assertSame('Continuar seguimiento', dominio_siguiente_paso('tecnico', 'en_curso')['label']);
+        $this->assertSame('Esperando al cliente', dominio_siguiente_paso('tecnico', 'esperando_cliente')['label']);
         $this->assertSame('Esperando confirmacion', dominio_siguiente_paso('tecnico', 'resuelta')['label']);
         $this->assertSame('Finalizada', dominio_siguiente_paso('cliente', 'cerrada')['label']);
         $puntos = dominio_prioridad_operativa([

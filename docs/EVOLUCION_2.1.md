@@ -48,6 +48,10 @@
 
 ## Aplicar cambios de esquema
 
+Las migraciones 18 (espera) y 19 (Gmail) se aplican despues de la 17. No convierten
+incidencias antiguas ni importan correos por si solas. Una vez actualizada la
+instalacion, Gmail sigue desactivado hasta configurar y autorizar el buzon.
+
 La migracion nueva `20260907000017_respuestas_reutilizables.php` habilita las
 ediciones persistentes. Aplicar las migraciones pendientes con el procedimiento
 habitual y copia previa; no ejecutar seeds sobre instalaciones existentes.
@@ -58,12 +62,26 @@ La actualizacion no modifica los mensajes enviados ni los borradores existentes.
 privado fuera de la carpeta web. No incluye adjuntos ni configuracion, no cifra
 el archivo y no sustituye una prueba de restauracion. Nunca subir la copia a Git.
 
-## Pendiente de la fase propuesta
+## Espera explicita (implementada)
 
-- Estado explicito Esperando al cliente, con politica de pausa de SLA y
-  reanudacion probada; no deducirlo solo del ultimo autor del mensaje.
-- Correo entrante con remitentes autorizados, aislamiento de empresas,
-  identificacion segura del hilo y proteccion contra duplicados/bucles.
+- La migracion 18 anade el estado Esperando al cliente. Enviar una respuesta con
+  «Pedir informacion y esperar» publica la pregunta y cambia el estado en una
+  transaccion. Una respuesta publica nueva retoma el trabajo; una nota interna
+  o un reintento duplicado no lo hacen. No se deduce del ultimo autor.
+- La espera no pausa el SLA. Se conserva la politica actual, visible al enviar.
+  Una futura pausa por contrato necesita configuracion y calculo laboral propios;
+  no se considera implementada aqui. No se convierten incidencias antiguas a espera.
+
+## Gmail: primera entrega
+
+Consulta [GMAIL.md](GMAIL.md). Incluye conector de solo lectura, revision de
+identidad y creacion supervisada con clasificacion IA. Requiere migracion 19 y
+consentimiento OAuth del propietario para conectarse realmente.
+
+## Pendiente
+
+- Agregar respuestas de Gmail a conversaciones existentes; esta version bloquea
+  la creacion de otra incidencia cuando el hilo ya se importo.
 - Registrar resultados comerciales confirmados para evaluar las alertas con
   el tiempo y, solo con suficiente muestra, validar modelos predictivos.
 

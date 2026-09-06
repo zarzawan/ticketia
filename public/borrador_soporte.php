@@ -16,7 +16,7 @@ $mensaje = (string)($_POST['mensaje'] ?? '');
 $accion = (string)($_POST['accion_respuesta'] ?? 'responder');
 $version = (int)($_POST['borrador_version'] ?? 0);
 $usuario = (int)auth_usuario()['id'];
-if (mb_strlen($mensaje) > 30000 || !in_array($accion, ['responder','nota','resolver'], true)) { http_response_code(400); exit; }
+if (mb_strlen($mensaje) > 30000 || !in_array($accion, ['responder','nota','resolver','esperar'], true)) { http_response_code(400); exit; }
 try {
     if ($version === 0) {
         $stmt = $pdo->prepare('INSERT IGNORE INTO soporte_borradores (usuario_id, incidencia_id, mensaje, accion) VALUES (:usuario, :id, :mensaje, :accion)');

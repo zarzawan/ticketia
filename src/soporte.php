@@ -19,8 +19,14 @@ function soporte_huella(PDO $pdo, int $id): string {
 }
 
 /** Devuelve ok, duplicado o conflicto. Un reenvio nunca modifica otra incidencia. */
-function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, bool $interno, string $solicitud, string $huella = ''): string {
+function soporte_espera_disponible(PDO $pdo): bool {
+    $columna = $pdo->query("SHOW COLUMNS FROM incidencias LIKE 'estado'")->fetch(PDO::FETCH_ASSOC);
+    return str_contains((string)($columna['Type'] ?? ''), "'esperando_cliente'");
+}
+
+function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, bool $interno, string $solicitud, string $huella = '', bool $esperar = false): string {
     $moderno = soporte_esquema_disponible($pdo);
+    if ($esperar && ($interno || !in_array($usuario['rol'], ['admin','operador'], true) || !soporte_espera_disponible($pdo))) return 'conflicto';
     if ($mensaje === '' || mb_strlen($mensaje) > 30000 || !preg_match('/^[a-f0-9]{32}$/D', $solicitud)) return 'conflicto';
     $pdo->beginTransaction();
     try {
@@ -51,10 +57,11 @@ function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, b
         $params = [':id' => $id, ':usuario' => $usuario['id'], ':autor' => $autor, ':mensaje' => $mensaje, ':interno' => (int)$interno];
         if ($moderno) $params[':solicitud'] = $solicitud;
         $pdo->prepare($sql)->execute($params);
-        if (!$interno && $autor === 'tecnico' && $estado === 'abierta') {
-            $pdo->prepare("UPDATE incidencias SET estado = 'en_curso' WHERE id = :id")->execute([':id' => $id]);
+        $nuevo = $esperar ? 'esperando_cliente' : (!$interno && $estado === 'esperando_cliente' ? 'en_curso' : (!$interno && $autor === 'tecnico' && $estado === 'abierta' ? 'en_curso' : $estado));
+        if ($nuevo !== $estado) {
+            $pdo->prepare('UPDATE incidencias SET estado = :estado WHERE id = :id')->execute([':estado'=>$nuevo, ':id' => $id]);
             $pdo->prepare("INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
-                VALUES (:id, :usuario, 'abierta', 'en_curso')")->execute([':id' => $id, ':usuario' => $usuario['id']]);
+                VALUES (:id, :usuario, :anterior, :nuevo)")->execute([':id' => $id, ':usuario' => $usuario['id'], ':anterior'=>$estado, ':nuevo'=>$nuevo]);
         }
         $pdo->commit();
         return 'ok';

@@ -9,6 +9,7 @@ function ui_estado_label(string $estado): string {
     $map = [
         'abierta' => 'Nueva',
         'en_curso' => 'En trabajo',
+        'esperando_cliente' => 'Esperando al cliente',
         'resuelta' => 'Solucion propuesta',
         'cerrada' => 'Cerrada'
     ];
@@ -237,6 +238,7 @@ function ui_admin_nav(string $activa): string {
         'admin_calendario.php' => ['Horario de servicio', 'Jornada, festivos y simulacion', 'historial', 'Servicio'],
         'admin_conocimiento.php' => ['Conocimiento', 'Articulos y autoservicio', 'libro', 'Servicio'],
         'respuestas.php' => ['Respuestas reutilizables', 'Textos compartidos del equipo', 'libro', 'Servicio'],
+        'admin_correo_entrante.php' => ['Correo entrante', 'Gmail y revision de remitentes', 'flujo', 'Servicio'],
         'admin_catalogo.php' => ['Catalogo comercial', 'Productos para el asistente', 'catalogo', 'Servicio'],
         'ver_logs_llm.php' => ['Control de IA', 'Calidad, consumo y errores', 'ia', 'Plataforma'],
         'admin_ajustes.php' => ['Configuracion', 'IA, SLA y mantenimiento', 'ajustes', 'Plataforma'],

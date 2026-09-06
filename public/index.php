@@ -121,7 +121,7 @@ function appendCommonFilters(&$sql, &$params, $busqueda, $filtro_tipo, $filtro_u
     // La bandeja diaria nunca arrastra trabajo finalizado. Las soluciones
     // pendientes solo aparecen cuando el usuario abre esa cola expresamente.
     if ($filtro_estado === '') {
-        $sql .= " AND estado IN ('abierta','en_curso')";
+        $sql .= " AND estado IN ('abierta','en_curso','esperando_cliente')";
     }
 
     bandeja_append_cola($sql, $cola);
@@ -134,7 +134,7 @@ function appendFiltersWithoutTipo(&$sql, &$params, $busqueda, $filtro_urgencia, 
 function buildQueryUrl(array $updates = [], array $remove = []): string {
     $query = $_GET;
     // Cambiar filtros, vista u orden vuelve al principio de la cola.
-    foreach (['pagina', 'pagina_abierta', 'pagina_en_curso', 'pagina_resuelta'] as $clave) unset($query[$clave]);
+    foreach (['pagina', 'pagina_abierta', 'pagina_en_curso', 'pagina_esperando_cliente', 'pagina_resuelta'] as $clave) unset($query[$clave]);
 
     foreach ($remove as $key) {
         unset($query[$key]);
@@ -202,14 +202,14 @@ $sql_kpi = "
         SUM(estado = 'en_curso') AS en_curso,
         SUM(estado = 'cerrada') AS cerradas,
         SUM(urgencia = 'critico') AS criticas,
-        SUM(urgencia = 'critico' AND estado IN ('abierta','en_curso')) AS criticas_abiertas,
-        SUM(estado IN ('abierta','en_curso') AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
-        SUM(asignado_id IS NULL AND estado IN ('abierta','en_curso')) AS sin_asignar,
-        SUM(asignado_id = :kpi_yo AND estado IN ('abierta','en_curso')) AS mios,
+        SUM(urgencia = 'critico' AND estado IN ('abierta','en_curso','esperando_cliente')) AS criticas_abiertas,
+        SUM(estado IN ('abierta','en_curso','esperando_cliente') AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
+        SUM(asignado_id IS NULL AND estado IN ('abierta','en_curso','esperando_cliente')) AS sin_asignar,
+        SUM(asignado_id = :kpi_yo AND estado IN ('abierta','en_curso','esperando_cliente')) AS mios,
         SUM(tipo = 'Comercial') AS comerciales,
         AVG(CASE WHEN fecha_cierre IS NOT NULL THEN TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_cierre) END) AS ttr_horas,
-        AVG(CASE WHEN estado IN ('abierta','en_curso') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
-        MAX(CASE WHEN estado IN ('abierta','en_curso') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS incidencia_mas_antigua_h
+        AVG(CASE WHEN estado IN ('abierta','en_curso','esperando_cliente') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
+        MAX(CASE WHEN estado IN ('abierta','en_curso','esperando_cliente') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS incidencia_mas_antigua_h
     FROM $fuente_bandeja
     WHERE 1=1
 ";
@@ -683,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function actualizarEstadoVisual(card, estado) {
-        card.classList.remove('abierta', 'en_curso', 'resuelta', 'cerrada');
+        card.classList.remove('abierta', 'en_curso', 'esperando_cliente', 'resuelta', 'cerrada');
         card.classList.add(estado);
     }
 
@@ -715,6 +715,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const targetState = column.dataset.estado;
             const sourceState = sourceColumn.dataset.estado;
+            if (targetState === 'esperando_cliente') {
+                alert('Abre la incidencia y envia una peticion de informacion con la opcion Pedir informacion y esperar. El SLA sigue contando.');
+                return;
+            }
             if (!targetState || targetState === sourceState) {
                 return;
             }

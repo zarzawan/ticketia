@@ -800,6 +800,8 @@ input[type="submit"]:active,
 .kanban-column.en-curso {
     border-top: 3px solid var(--warning);
 }
+.kanban-column.esperando-cliente { border-top: 3px solid var(--warning); }
+.pill-esperando-cliente { color: var(--text); background: var(--surface-2); border: 1px solid var(--warning); }
 
 .kanban-column.cerrada {
     border-top: 3px solid var(--success);

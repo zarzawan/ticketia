@@ -15,15 +15,15 @@ $filtro_urgencia = isset($_GET['filtro_urgencia']) && in_array($_GET['filtro_urg
 $filtro_estado = isset($_GET['filtro_estado']) && in_array($_GET['filtro_estado'], $estados) ? $_GET['filtro_estado'] : '';
 
 // Obtener datos para los gráficos
-$sql_tipos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo IS NOT NULL AND estado IN ('abierta','en_curso') GROUP BY tipo";
+$sql_tipos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo IS NOT NULL AND estado IN ('abierta','en_curso','esperando_cliente') GROUP BY tipo";
 $stmt_tipos = $pdo->query($sql_tipos);
 $datos_tipos = $stmt_tipos->fetchAll(PDO::FETCH_ASSOC);
 
-$sql_urgencias = "SELECT urgencia, COUNT(*) as total FROM incidencias WHERE estado IN ('abierta','en_curso') GROUP BY urgencia";
+$sql_urgencias = "SELECT urgencia, COUNT(*) as total FROM incidencias WHERE estado IN ('abierta','en_curso','esperando_cliente') GROUP BY urgencia";
 $stmt_urgencias = $pdo->query($sql_urgencias);
 $datos_urgencias = $stmt_urgencias->fetchAll(PDO::FETCH_ASSOC);
 
-$sql_estados = "SELECT estado, COUNT(*) as total FROM incidencias WHERE estado IN ('abierta','en_curso') GROUP BY estado";
+$sql_estados = "SELECT estado, COUNT(*) as total FROM incidencias WHERE estado IN ('abierta','en_curso','esperando_cliente') GROUP BY estado";
 $stmt_estados = $pdo->query($sql_estados);
 $datos_estados = $stmt_estados->fetchAll(PDO::FETCH_ASSOC);
 
@@ -38,7 +38,7 @@ function mostrarIncidencias($pdo, $busqueda, $filtro_tipo, $filtro_urgencia, $fi
         $sql .= " AND estado = :estado";
         $params[':estado'] = $filtro_estado;
     } else {
-        $sql .= " AND estado IN ('abierta','en_curso')";
+        $sql .= " AND estado IN ('abierta','en_curso','esperando_cliente')";
     }
 
     if ($filtro_tipo) {
@@ -150,7 +150,7 @@ try {
         $sql .= " AND estado = :estado";
         $params[':estado'] = $filtro_estado;
     } else {
-        $sql .= " AND estado IN ('abierta','en_curso')";
+        $sql .= " AND estado IN ('abierta','en_curso','esperando_cliente')";
     }
     if ($filtro_tipo) {
         $sql .= " AND tipo = :tipo";
@@ -170,7 +170,7 @@ try {
         }
     }
 
-    $sql .= " ORDER BY FIELD(estado, 'abierta', 'en_curso', 'resuelta', 'cerrada'), fecha_creacion ASC LIMIT 60";
+    $sql .= " ORDER BY FIELD(estado, 'abierta', 'en_curso', 'esperando_cliente', 'resuelta', 'cerrada'), fecha_creacion ASC LIMIT 60";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -220,7 +220,7 @@ try {
     $resumen = [
         'total' => count($incidencias),
         'abierta' => 0,
-        'en_curso' => 0,
+        'en_curso' => 0, 'esperando_cliente' => 0,
         'resuelta' => 0,
         'cerrada' => 0,
         'criticas' => 0,
@@ -296,7 +296,7 @@ try {
     // Optimización del JSON
     // Tablas de código ultracortas
     $urgMap = ['critico' => 'c', 'urgente' => 'u', 'leve' => 'l'];
-    $estMap = ['abierta' => 'a', 'en_curso' => 'e', 'resuelta' => 'r', 'cerrada' => 'z'];
+    $estMap = ['abierta' => 'a', 'en_curso' => 'e', 'esperando_cliente' => 'w', 'resuelta' => 'r', 'cerrada' => 'z'];
     $tipoMap = [
         'Servidores' => 1, 'Red y acceso' => 2, 'Seguridad' => 3, 'Software y apps' => 4,
         'Microsoft 365' => 5, 'APIs y scripts' => 6, 'Correo' => 7, 'Bases de datos' => 8,

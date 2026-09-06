@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $diasCierre = dominio_ajuste_entero($pdo, 'dias_cierre_automatico', 7, 1, 90);
 $diasArchivo = dominio_ajuste_entero($pdo, 'dias_archivo_automatico', 30, 1, 3650);
 $conteos = $pdo->query(
-    "SELECT SUM(estado IN ('abierta','en_curso')) AS activas,
+    "SELECT SUM(estado IN ('abierta','en_curso','esperando_cliente')) AS activas,
             SUM(estado = 'resuelta') AS resueltas,
             SUM(estado = 'cerrada' AND fecha_archivo IS NULL) AS cerradas,
             SUM(fecha_archivo IS NOT NULL) AS archivadas

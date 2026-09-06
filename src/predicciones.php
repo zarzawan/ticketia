@@ -44,16 +44,17 @@ function predicciones_metricas(PDO $pdo, array $ids, int $dias, DateTimeImmutabl
     $sql = "SELECT cliente_id, COUNT(*) AS historicas,
         SUM(fecha_creacion >= $desde) AS recientes,
         SUM(fecha_creacion >= $anterior AND fecha_creacion < $desde) AS anteriores,
-        SUM(estado IN ('abierta','en_curso')) AS activas,
+        SUM(estado IN ('abierta','en_curso','esperando_cliente')) AS activas,
         SUM(estado = 'abierta') AS abiertas,
         SUM(estado = 'en_curso') AS en_curso,
+        SUM(estado = 'esperando_cliente') AS esperando_cliente,
         SUM(estado = 'resuelta') AS resueltas,
         SUM(estado = 'cerrada') AS cerradas,
         SUM(fecha_creacion >= $desde AND tipo = 'Quejas y reclamaciones') AS quejas,
         SUM(fecha_creacion >= $desde AND tipo IN ('Comercial','Cambios y mejoras')) AS comerciales,
         SUM(fecha_creacion >= $desde AND EXISTS (SELECT 1 FROM cambios_estado ce
             WHERE ce.id_incidencia = incidencias.id AND ce.estado_anterior IN ('resuelta','cerrada')
-            AND ce.estado_nuevo IN ('abierta','en_curso') AND ce.fecha >= $desde AND ce.fecha <= $hasta)) AS reabiertas,
+            AND ce.estado_nuevo IN ('abierta','en_curso','esperando_cliente') AND ce.fecha >= $desde AND ce.fecha <= $hasta)) AS reabiertas,
         SUM(fecha_creacion >= $desde AND valoraciones.media IS NOT NULL) AS valoradas,
         AVG(CASE WHEN fecha_creacion >= $desde THEN valoraciones.media END) AS satisfaccion,
         AVG(CASE WHEN fecha_creacion >= $desde AND primera_respuesta >= fecha_creacion
@@ -68,7 +69,7 @@ function predicciones_metricas(PDO $pdo, array $ids, int $dias, DateTimeImmutabl
     $resultado = [];
     foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $fila) $resultado[(int)$fila['cliente_id']] = $fila + ['vencidas'=>0];
     $vencidas = $pdo->query("SELECT cliente_id,COUNT(*) AS total FROM $fuente
-        WHERE cliente_id IN ($lista) AND fecha_creacion <= $hasta AND estado IN ('abierta','en_curso')
+        WHERE cliente_id IN ($lista) AND fecha_creacion <= $hasta AND estado IN ('abierta','en_curso','esperando_cliente')
         AND sla_estado = 'vencido' GROUP BY cliente_id")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($vencidas as $fila) $resultado[(int)$fila['cliente_id']]['vencidas'] = (int)$fila['total'];
     return $resultado;

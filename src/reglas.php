@@ -18,7 +18,7 @@ function reglas_coincide(array $regla, array $ticket): bool {
 function reglas_candidato(PDO $pdo, int $equipo): ?int {
     $stmt = $pdo->prepare("SELECT u.id FROM equipos_miembros m JOIN usuarios u ON u.id = m.usuario_id
         WHERE m.equipo_id = :equipo AND u.activo = 1 AND u.rol IN ('admin','operador')
-        ORDER BY (SELECT COUNT(*) FROM incidencias WHERE asignado_id = u.id AND estado IN ('abierta','en_curso')), u.id LIMIT 1");
+        ORDER BY (SELECT COUNT(*) FROM incidencias WHERE asignado_id = u.id AND estado IN ('abierta','en_curso','esperando_cliente')), u.id LIMIT 1");
     $stmt->execute([':equipo' => $equipo]);
     return ($id = $stmt->fetchColumn()) !== false ? (int)$id : null;
 }

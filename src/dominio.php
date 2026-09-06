@@ -67,12 +67,12 @@ function dominio_urgencias(): array {
 }
 
 function dominio_estados(): array {
-    return ['abierta', 'en_curso', 'resuelta', 'cerrada'];
+    return ['abierta', 'en_curso', 'esperando_cliente', 'resuelta', 'cerrada'];
 }
 
 /** Estados que forman parte del trabajo diario y no del historico. */
 function dominio_estados_activos(): array {
-    return ['abierta', 'en_curso'];
+    return ['abierta', 'en_curso', 'esperando_cliente'];
 }
 
 /** Codigos normalizados para explicar como se resolvio una incidencia. */
@@ -268,9 +268,10 @@ function dominio_siguiente_paso(?string $ultimo_autor, string $estado): array {
     if ($estado === 'resuelta') {
         return ['clave' => 'cliente', 'label' => 'Esperando confirmacion'];
     }
-    if ($ultimo_autor === 'tecnico') {
+    if ($estado === 'esperando_cliente') {
         return ['clave' => 'cliente', 'label' => 'Esperando al cliente'];
     }
+    if ($ultimo_autor === 'tecnico') return ['clave' => 'equipo', 'label' => 'Continuar seguimiento'];
     return ['clave' => 'equipo', 'label' => 'Responder ahora'];
 }
 
@@ -297,7 +298,7 @@ function dominio_prioridad_operativa_desglose(array $incidencia, ?DateTimeImmuta
         $puntos += 10;
         $factores[] = ['label' => 'Sin responsable', 'puntos' => 10];
     }
-    if (($incidencia['ultimo_autor'] ?? null) !== 'tecnico' && in_array(($incidencia['estado'] ?? ''), dominio_estados_activos(), true)) {
+    if (($incidencia['ultimo_autor'] ?? null) !== 'tecnico' && in_array(($incidencia['estado'] ?? ''), ['abierta','en_curso'], true)) {
         $puntos += 10;
         $factores[] = ['label' => 'Requiere respuesta del equipo', 'puntos' => 10];
     }

@@ -10,12 +10,12 @@ $id_incidencia = filter_input(INPUT_POST, 'id_incidencia', FILTER_VALIDATE_INT);
 $mensaje = trim((string)($_POST['mensaje'] ?? ''));
 $interno = isset($_POST['interno']) && $_POST['interno'] === '1' && !auth_es('cliente');
 $accion = (string)($_POST['accion_respuesta'] ?? 'responder');
-if (!in_array($accion, ['responder', 'resolver', 'nota'], true) || (auth_es('cliente') && $accion !== 'responder')) {
+if (!in_array($accion, ['responder', 'resolver', 'nota', 'esperar'], true) || (auth_es('cliente') && $accion !== 'responder')) {
     http_response_code(400);
     exit('Accion no valida.');
 }
 if ($accion === 'nota') $interno = true;
-if ($accion === 'resolver' && $interno) {
+if (in_array($accion, ['resolver','esperar'], true) && $interno) {
     http_response_code(400);
     exit('Una solucion debe ser visible para el cliente.');
 }
@@ -83,7 +83,7 @@ if ($accion === 'resolver') {
     }
     auditar($pdo, 'resolver_incidencia', "incidencia #$id_incidencia desde conversacion");
 } else {
-    $guardado = soporte_responder($pdo, (int)$id_incidencia, $usuario, $mensaje_final, $interno, $solicitud, $huella);
+    $guardado = soporte_responder($pdo, (int)$id_incidencia, $usuario, $mensaje_final, $interno, $solicitud, $huella, $accion === 'esperar');
     if ($guardado === 'conflicto') {
         header("Location: $pagina_detalle?id=$id_incidencia&conflicto=1");
         exit;

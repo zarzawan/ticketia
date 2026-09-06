@@ -2,6 +2,14 @@
 
 ## Proximamente — v2.1 en desarrollo
 
+- Estado explicito Esperando al cliente: peticion publica y transicion atomicas,
+  retorno a En trabajo al responder el cliente, cola propia y presencia en
+  informes, portal y predicciones. No pausa ni modifica los objetivos SLA.
+- Gmail / Workspace: conector OAuth de solo lectura, lotes con cursor y
+  deduplicacion, bandeja de revision administrativa y alta supervisada con IA.
+  Requiere consentimiento del propietario; los hilos existentes se bloquean
+  hasta incorporar el flujo de respuestas por correo.
+
 - IA bajo demanda en predicciones, redaccion de respuestas compartidas y
   organizacion del reparto. Validacion estructurada, cache privada y propuestas
   revisables, sin cambios automaticos ni modificaciones del streaming.

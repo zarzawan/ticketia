@@ -54,7 +54,7 @@ $stmt = $pdo->prepare(
     "SELECT c.*,
             (SELECT COUNT(*) FROM usuarios u WHERE u.cliente_id = c.id) AS usuarios,
             (SELECT COUNT(*) FROM incidencias i WHERE i.cliente_id = c.id) AS tickets,
-            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado IN ('abierta','en_curso')) AS tickets_abiertos
+            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado IN ('abierta','en_curso','esperando_cliente')) AS tickets_abiertos
      FROM clientes c WHERE $condicion ORDER BY c.nombre, c.id LIMIT 25 OFFSET $offset"
 );
 $stmt->execute($params);

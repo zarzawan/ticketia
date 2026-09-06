@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../src/arranque.php';
 
 // Obtener todas las incidencias ordenadas por estado y fecha
-$sql = "SELECT * FROM incidencias ORDER BY FIELD(estado, 'abierta', 'en_curso', 'resuelta', 'cerrada'), fecha_creacion ASC";
+$sql = "SELECT * FROM incidencias ORDER BY FIELD(estado, 'abierta', 'en_curso', 'esperando_cliente', 'resuelta', 'cerrada'), fecha_creacion ASC";
 $stmt = $pdo->query($sql);
 $incidencias = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -10,7 +10,7 @@ $resultado = [];
 $resumen = [
     'total' => count($incidencias),
     'abierta' => 0,
-    'en_curso' => 0,
+    'en_curso' => 0, 'esperando_cliente' => 0,
     'cerrada' => 0,
     'criticas' => 0,
     'sin_respuesta' => 0
