@@ -156,9 +156,9 @@ function dominio_sla_objetivos(string $urgencia, string $tipo_incidencia = '', s
 
 /** Calcula un SLA derivado y explicable. $ahora permite pruebas deterministas. */
 function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = null): array {
-    $ahora = $ahora ?? new DateTimeImmutable();
+    $ahora = calendario_civil(($ahora ?? new DateTimeImmutable())->format('Y-m-d H:i:s'));
     try {
-        $creada = new DateTimeImmutable((string)($incidencia['fecha_creacion'] ?? 'now'));
+        $creada = calendario_civil((string)($incidencia['fecha_creacion'] ?? $ahora->format('Y-m-d H:i:s')));
     } catch (Exception $e) {
         $creada = $ahora;
     }
@@ -168,8 +168,8 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
         (string)($incidencia['tipo'] ?? ''),
         (string)($incidencia['nivel_servicio'] ?? 'estandar')
     );
-    $limiteRespuesta = $creada->modify('+' . $objetivos['primera_respuesta'] . ' hours');
-    $limiteResolucion = $creada->modify('+' . $objetivos['resolucion'] . ' hours');
+    $limiteRespuesta = calendario_limite($creada, $objetivos['primera_respuesta']);
+    $limiteResolucion = calendario_limite($creada, $objetivos['resolucion']);
     $estadoIncidencia = (string)($incidencia['estado'] ?? '');
     $finalizada = in_array($estadoIncidencia, ['resuelta', 'cerrada'], true);
     $referencia = $ahora;
@@ -178,16 +178,16 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
         : ($incidencia['fecha_resolucion'] ?? ($incidencia['fecha_cierre'] ?? null));
     if ($finalizada && !empty($fechaFinal)) {
         try {
-            $referencia = new DateTimeImmutable((string)$fechaFinal);
+            $referencia = calendario_civil((string)$fechaFinal);
         } catch (Exception $e) {
             $referencia = $ahora;
         }
     }
 
-    $duracionResolucion = max(1, $limiteResolucion->getTimestamp() - $creada->getTimestamp());
-    $consumidoResolucion = max(0, $referencia->getTimestamp() - $creada->getTimestamp());
+    $duracionResolucion = max(1, calendario_segundos($creada, $limiteResolucion));
+    $consumidoResolucion = max(0, calendario_segundos($creada, $referencia));
     $porcentajeResolucion = (int)round(($consumidoResolucion / $duracionResolucion) * 100);
-    $restanteResolucion = $limiteResolucion->getTimestamp() - $referencia->getTimestamp();
+    $restanteResolucion = calendario_segundos($referencia, $limiteResolucion);
     $estadoResolucion = $referencia > $limiteResolucion ? 'vencido' : ($porcentajeResolucion >= 75 ? 'riesgo' : 'ok');
     if ($finalizada && $estadoResolucion !== 'vencido') {
         $estadoResolucion = 'cumplido';
@@ -196,14 +196,14 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
     $primeraRespuesta = null;
     if (!empty($incidencia['primera_respuesta'])) {
         try {
-            $primeraRespuesta = new DateTimeImmutable((string)$incidencia['primera_respuesta']);
+            $primeraRespuesta = calendario_civil((string)$incidencia['primera_respuesta']);
         } catch (Exception $e) {
             $primeraRespuesta = null;
         }
     }
     $referenciaRespuesta = $primeraRespuesta ?? $referencia;
-    $duracionRespuesta = max(1, $limiteRespuesta->getTimestamp() - $creada->getTimestamp());
-    $consumidoRespuesta = max(0, $referenciaRespuesta->getTimestamp() - $creada->getTimestamp());
+    $duracionRespuesta = max(1, calendario_segundos($creada, $limiteRespuesta));
+    $consumidoRespuesta = max(0, calendario_segundos($creada, $referenciaRespuesta));
     $porcentajeRespuesta = (int)round(($consumidoRespuesta / $duracionRespuesta) * 100);
     if ($referenciaRespuesta > $limiteRespuesta) {
         $estadoRespuesta = 'vencido';
@@ -230,7 +230,7 @@ function dominio_sla_calcular(array $incidencia, ?DateTimeImmutable $ahora = nul
         : 'resolucion';
     $porcentaje = $objetivoActual === 'primera_respuesta' ? $porcentajeRespuesta : $porcentajeResolucion;
     $restanteSegundos = $objetivoActual === 'primera_respuesta'
-        ? $limiteRespuesta->getTimestamp() - $referenciaRespuesta->getTimestamp()
+        ? calendario_segundos($referenciaRespuesta, $limiteRespuesta)
         : $restanteResolucion;
 
     return [
@@ -379,18 +379,23 @@ function dominio_order_by(string $orden): string {
  * Cambia el estado de una incidencia dejando rastro en cambios_estado y
  * manteniendo fecha_cierre. Devuelve false si la incidencia no existe.
  */
-function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_estado): bool {
+function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_estado, ?array $estados_permitidos = null, string $motivo = ''): bool {
     if (!in_array($nuevo_estado, dominio_estados(), true)) {
         return false;
     }
 
-    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
+    $propia = !$pdo->inTransaction();
+    if ($propia) $pdo->beginTransaction();
+    try {
+    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id FOR UPDATE");
     $stmt->execute([':id' => $id_incidencia]);
     $actual = $stmt->fetchColumn();
-    if ($actual === false) {
+    if ($actual === false || ($estados_permitidos !== null && !in_array($actual, $estados_permitidos, true))) {
+        if ($propia) $pdo->rollBack();
         return false;
     }
     if ($actual === $nuevo_estado) {
+        if ($propia) $pdo->commit();
         return true;
     }
 
@@ -415,6 +420,17 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
         ':nuevo' => $nuevo_estado,
     ]);
 
+    if ($motivo !== '') {
+        $pdo->prepare('INSERT INTO reaperturas (id_incidencia, motivo) VALUES (:id, :motivo)')
+            ->execute([':id' => $id_incidencia, ':motivo' => mb_substr($motivo, 0, 30000)]);
+    }
+    if ($propia) $pdo->commit();
+    } catch (Throwable $e) {
+        if (!$propia) throw $e;
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('TicketIA: no se pudo cambiar el estado.');
+        return false;
+    }
     if (function_exists('correo_notificar_estado')) {
         correo_notificar_estado($pdo, $id_incidencia, (string)$actual, $nuevo_estado);
     }
@@ -423,7 +439,7 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
 }
 
 /** Propone una solucion y detiene el SLA a la espera de confirmacion. */
-function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, string $notas): bool {
+function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, string $notas, string $huella = '', string $solicitud = ''): bool {
     $notas = trim($notas);
     if (!isset(dominio_codigos_resolucion()[$codigo]) || $notas === '' || mb_strlen($notas) > 30000) return false;
     $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
@@ -432,6 +448,10 @@ function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, strin
         $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id FOR UPDATE");
         $stmt->execute([':id' => $id_incidencia]);
         $actual = $stmt->fetchColumn();
+        if ($huella !== '' && !hash_equals(soporte_huella($pdo, $id_incidencia), $huella)) {
+            $pdo->rollBack();
+            return false;
+        }
         if ($actual === false || !in_array((string)$actual, dominio_estados_activos(), true)) {
             $pdo->rollBack();
             return false;
@@ -449,6 +469,10 @@ function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, strin
             "INSERT INTO mensajes (id_incidencia, usuario_id, autor, mensaje, interno, fecha)
              VALUES (:id, :usuario, 'tecnico', :mensaje, 0, NOW())"
         )->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null, ':mensaje' => "Solucion propuesta:\n\n" . $notas]);
+        if ($solicitud !== '' && preg_match('/^[a-f0-9]{32}$/D', $solicitud) && soporte_esquema_disponible($pdo)) {
+            $pdo->prepare('UPDATE mensajes SET solicitud_id = :solicitud WHERE id = :id')
+                ->execute([':solicitud' => $solicitud, ':id' => (int)$pdo->lastInsertId()]);
+        }
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -497,8 +521,9 @@ function incidencias_ejecutar_mantenimiento(PDO $pdo): array {
     $stmt->bindValue(':dias', $diasCierre, PDO::PARAM_INT);
     $stmt->execute();
     $idsCierre = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    $cerradas = 0;
     foreach ($idsCierre as $id) {
-        incidencia_cambiar_estado($pdo, $id, 'cerrada');
+        if (incidencia_cambiar_estado($pdo, $id, 'cerrada', ['resuelta'])) $cerradas++;
     }
 
     $stmtArchivo = $pdo->prepare(
@@ -512,7 +537,7 @@ function incidencias_ejecutar_mantenimiento(PDO $pdo): array {
     $stmtArchivo->execute();
 
     return [
-        'cerradas' => count($idsCierre),
+        'cerradas' => $cerradas,
         'archivadas' => $stmtArchivo->rowCount(),
         'dias_cierre' => $diasCierre,
         'dias_archivo' => $diasArchivo,

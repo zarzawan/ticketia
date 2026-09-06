@@ -112,7 +112,7 @@ El proveedor simulado comprueba el protocolo; no mide la calidad del modelo real
 - El ensayo HTTP cubre ambos endpoints de solución, fallo de inserción con rollback,
   reapertura, duplicados, permisos, privacidad de notas y asignación desde tarjeta.
 
-Pendiente temporal: el modelo existente almacena `DATETIME` sin zona. El cálculo
-SQL de intervalos y el cálculo PHP pueden diferir al cruzar cambios de horario.
-Antes de un despliegue multizona hay que fijar y migrar una convención temporal
-común; no se han reinterpretado las fechas ni las políticas existentes en esta fase.
+La fase de [operacion profesional](OPERACION_PROFESIONAL.md) unifica SQL y PHP
+sobre hora civil y añade calendario laboral opcional. No reinterpreta DATETIME
+historicos como UTC: para un despliegue multizona sigue siendo necesario conocer
+la procedencia de las fechas y preparar una conversion especifica.

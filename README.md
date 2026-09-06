@@ -1,11 +1,13 @@
-# TicketIA
+# TicketIA 2.0
 
 **Helpdesk open source con IA — self-hosted, multilingüe y con soporte de IA 100% local.**
 
 *Open source AI-powered helpdesk — self-hosted, multilingual, works with fully local AI.*
 
-> ⚠️ **Estado: en desarrollo activo (pre-v1.0).** Incluye autenticación con roles, CSRF y
-> auditoría, pero aún no ha pasado una revisión de seguridad externa.
+> **Version actual: [v2.0.0](https://github.com/zarzawan/ticketia/releases/tag/v2.0.0).**
+> Desarrollo activo. Incluye autenticacion con roles, CSRF, segundo factor y auditoria;
+> no ha pasado una revision de seguridad externa. Antes de actualizar, consulta la
+> [guia de migracion y puesta en servicio](docs/OPERACION_PROFESIONAL.md).
 
 ---
 
@@ -137,7 +139,13 @@ Control de coste: `LLM_SOLO_LOCAL=1` ignora los proveedores de pago aunque haya 
 `LLM_LOG_RETENTION_DIAS` define cuantos dias se conservan las trazas; el worker
 elimina los registros antiguos por lotes.
 
-## Worker de trabajos IA
+## Operacion profesional
+
+Consulta la [guia de actualizacion y puesta en servicio](docs/OPERACION_PROFESIONAL.md)
+para activar borradores privados, fuentes del copiloto, equipos, calendario laboral
+y el panel de entregas y conservacion. Las migraciones no se aplican solas.
+
+## Worker de trabajos IA y correo
 
 Las tareas de IA que fallan (proveedor caído, timeout) se encolan y se reintentan con
 backoff. El mismo worker aplica el cierre y archivo automáticos. Programa el proceso con
@@ -219,7 +227,7 @@ La CI de GitHub Actions ejecuta lint, tests (PHP 8.2–8.3), escaneo de secretos
 prueba de humo Docker completa: levanta la pila, comprueba extensiones, instala el
 esquema, inicia el worker y valida un inicio de sesión real.
 
-## Hoja de ruta hacia v1.0
+## Estado del proyecto
 
 - [x] Núcleo de tickets + IA (POC endurecida)
 - [x] Instalador, migraciones, Docker, datos de demo
@@ -229,9 +237,9 @@ esquema, inicia el worker y valida un inicio de sesión real.
 - [x] Panel de administración
 - [x] Cola de trabajos IA y control de coste
 - [x] Tests + CI
-- [x] Release v1.0 y repositorio público
+- [x] Release v2.0 y repositorio publico
 
-Post-v1: email-to-ticket, búsqueda semántica con embeddings, SLA con alertas y API REST.
+Proximos pasos: email-to-ticket, API REST y monitorizacion externa del servicio.
 
 ## Contribuir
 

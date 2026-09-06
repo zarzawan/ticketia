@@ -987,5 +987,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 </script>
+<script src="bandeja.js?v=<?= (int)filemtime(__DIR__ . '/bandeja.js') ?>"></script>
 </body>
 </html>

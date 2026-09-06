@@ -67,7 +67,7 @@ function cuenta_recuperacion_solicitar(PDO $pdo, string $email): void {
         $enlace = correo_url_base() . '/restablecer_contrasena.php?token=' . rawurlencode($token);
         $nombre = htmlspecialchars((string)$usuario['nombre'], ENT_QUOTES, 'UTF-8');
         $enlaceHtml = htmlspecialchars($enlace, ENT_QUOTES, 'UTF-8');
-        $enviado = correo_enviar(
+        $enviado = correo_enviar_directo(
             [(string)$usuario['email']],
             'Restablecer acceso a TicketIA',
             "<p>Hola {$nombre}:</p>"

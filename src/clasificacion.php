@@ -127,4 +127,5 @@ function clasificacion_aplicar(PDO $pdo, int $id_incidencia, array $c): void {
         ':idioma' => $c['idioma'],
         ':id' => $id_incidencia
     ]);
+    reglas_aplicar($pdo, $id_incidencia);
 }

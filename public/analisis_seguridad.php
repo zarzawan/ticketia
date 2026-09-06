@@ -195,9 +195,7 @@ try {
         $ids = array_keys($incidencias);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        $stmt_m = $pdo->prepare("SELECT id_incidencia, autor, mensaje, fecha FROM mensajes WHERE id_incidencia IN ($placeholders) ORDER BY fecha ASC");
-        $stmt_m->execute($ids);
-        foreach ($stmt_m->fetchAll(PDO::FETCH_ASSOC) as $m) {
+        foreach (asistente_historial_reciente($pdo, $ids) as $m) {
             $incidencias[$m['id_incidencia']]['mensajes'][] = [
                 'autor' => $m['autor'],
                 'mensaje' => $m['mensaje'],
@@ -205,9 +203,7 @@ try {
             ];
         }
 
-        $stmt_r = $pdo->prepare("SELECT id_incidencia, motivo, fecha FROM reaperturas WHERE id_incidencia IN ($placeholders) ORDER BY fecha ASC");
-        $stmt_r->execute($ids);
-        foreach ($stmt_r->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        foreach (asistente_historial_reciente($pdo, $ids, true) as $r) {
             $incidencias[$r['id_incidencia']]['reaperturas'][] = [
                 'motivo' => $r['motivo'],
                 'fecha' => $r['fecha']
@@ -469,10 +465,7 @@ TXT;
         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
     );
 
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        error_log('Error al generar JSON: ' . json_last_error_msg());
-        die('Error al generar JSON: ' . json_last_error_msg());
-    }
+    // JSON_THROW_ON_ERROR ya valida esta serializacion, sin errores globales de otras lecturas.
 } catch (PDOException $e) {
     error_log('Error de base de datos: ' . $e->getMessage());
     $resumen = [];

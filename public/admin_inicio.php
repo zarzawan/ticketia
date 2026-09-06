@@ -13,8 +13,8 @@ $resumen = $pdo->query(
         (SELECT COUNT(*) FROM incidencias WHERE estado IN ('abierta','en_curso') AND fecha_creacion < NOW() - INTERVAL 48 HOUR) AS fuera_objetivo,
         (SELECT COUNT(*) FROM incidencias WHERE estado = 'resuelta') AS por_confirmar,
         (SELECT COUNT(*) FROM incidencias WHERE fecha_archivo IS NOT NULL) AS archivadas,
-        (SELECT COUNT(*) FROM trabajos_ia WHERE estado IN ('pendiente','en_curso')) AS cola_ia,
-        (SELECT COUNT(*) FROM trabajos_ia WHERE estado = 'fallido') AS fallos_ia"
+        (SELECT COUNT(*) FROM trabajos_ia WHERE tipo <> 'correo' AND estado IN ('pendiente','en_curso')) AS cola_ia,
+        (SELECT COUNT(*) FROM trabajos_ia WHERE tipo <> 'correo' AND estado = 'fallido') AS fallos_ia"
 )->fetch(PDO::FETCH_ASSOC);
 
 $agentes = $pdo->query(
@@ -60,6 +60,7 @@ $satisfaccion = $conocimientoActivo ? $pdo->query("SELECT COUNT(*) AS total, ROU
 $resultados = $pdo->query("SELECT COUNT(*) AS resueltas, ROUND(AVG(TIMESTAMPDIFF(MINUTE,fecha_creacion,fecha_resolucion))/60,1) AS horas FROM incidencias WHERE fecha_resolucion >= NOW() - INTERVAL 30 DAY AND estado IN ('resuelta','cerrada')")->fetch(PDO::FETCH_ASSOC);
 ui_admin_cabecera('Vista general', 'Una vision clara de tu equipo, tus clientes y el servicio.', 'admin_inicio.php');
 ?>
+<section class="admin-panel"><h2>Necesita atencion</h2><?php foreach (array_slice(operacion_alertas($pdo),0,5) as $alerta): ?><p><a href="<?= ui_e($alerta['url']) ?>"><strong><?= ui_e($alerta['titulo']) ?></strong></a> — <?= ui_e($alerta['detalle']) ?></p><?php endforeach; ?><a href="admin_operacion.php">Ver salud, entregas y conservacion &rarr;</a></section>
 
 <section class="admin-hero">
     <div><span class="admin-hero-kicker">Tu centro de operaciones &middot; <?= date('d/m/Y') ?></span><h2>Lo importante, a primera vista.</h2><p><?= (int)$resumen['tickets_criticos'] ?> criticas y <?= (int)$resumen['sin_asignar'] ?> sin responsable. <?= (int)$resumen['fuera_objetivo'] ?> llevan mas de 48 horas abiertas.</p></div>

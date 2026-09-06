@@ -14,15 +14,9 @@ if (!$id_incidencia || $motivo === '') {
     exit;
 }
 
-// Insertar en tabla de reaperturas
-$sql = "INSERT INTO reaperturas (id_incidencia, motivo) VALUES (:id_incidencia, :motivo)";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([
-    ':id_incidencia' => $id_incidencia,
-    ':motivo' => $motivo
-]);
-
-incidencia_cambiar_estado($pdo, $id_incidencia, 'en_curso');
+if (!incidencia_cambiar_estado($pdo, $id_incidencia, 'en_curso', ['resuelta', 'cerrada'], $motivo)) {
+    header("Location: ver_incidencia.php?id=$id_incidencia&conflicto=1"); exit;
+}
 auditar($pdo, 'reabrir_incidencia', "incidencia #$id_incidencia");
 
 header("Location: ver_incidencia.php?id=" . $id_incidencia);

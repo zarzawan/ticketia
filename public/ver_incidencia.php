@@ -24,14 +24,11 @@ if (!$incidencia) {
 }
 
 $asignables = usuarios_asignables($pdo);
+$borrador = soporte_borrador($pdo, (int)auth_usuario()['id'], (int)$id);
+$huella = soporte_huella($pdo, (int)$id);
 
-$sql_mensajes = "SELECT m.id, m.autor, m.mensaje, m.fecha, m.interno, u.nombre AS usuario_nombre
-                  FROM mensajes m
-                  LEFT JOIN usuarios u ON u.id = m.usuario_id
-                  WHERE m.id_incidencia = :id ORDER BY m.fecha ASC";
-$stmt_mensajes = $pdo->prepare($sql_mensajes);
-$stmt_mensajes->execute([':id' => $id]);
-$mensajes = $stmt_mensajes->fetchAll(PDO::FETCH_ASSOC);
+$paginaMensajes = soporte_mensajes($pdo, (int)$id, false, max(0, (int)($_GET['antes'] ?? 0)));
+$mensajes = $paginaMensajes['mensajes'];
 
 $ultimo_autor_publico = null;
 $primera_respuesta = null;
@@ -44,13 +41,20 @@ foreach ($mensajes as $mensaje_operativo) {
         $primera_respuesta = (string)$mensaje_operativo['fecha'];
     }
 }
+$stmt = $pdo->prepare("SELECT MIN(CASE WHEN autor = 'tecnico' THEN fecha END) AS primera,
+    (SELECT autor FROM mensajes WHERE id_incidencia = :ultimo AND interno = 0 ORDER BY fecha DESC, id DESC LIMIT 1) AS ultimo
+    FROM mensajes WHERE id_incidencia = :id AND interno = 0");
+$stmt->execute([':id' => $id, ':ultimo' => $id]);
+$operacion = $stmt->fetch(PDO::FETCH_ASSOC);
+$primera_respuesta = $operacion['primera'];
+$ultimo_autor_publico = $operacion['ultimo'];
 $sla = dominio_sla_calcular($incidencia + ['primera_respuesta' => $primera_respuesta]);
 $siguiente_paso = dominio_siguiente_paso($ultimo_autor_publico, (string)$incidencia['estado']);
 $es_activa = in_array((string)$incidencia['estado'], dominio_estados_activos(), true);
 $prioridad_info = dominio_prioridad_operativa_desglose($incidencia + ['ultimo_autor' => $ultimo_autor_publico]);
 $prioridad_operativa = $prioridad_info['total'];
 
-$stmt_copiloto = $pdo->prepare('SELECT contenido_hash, resumen, riesgo, sentimiento, siguiente_accion, respuesta_sugerida, confianza, actualizado_en FROM copiloto_ia WHERE id_incidencia = :id');
+$stmt_copiloto = $pdo->prepare('SELECT * FROM copiloto_ia WHERE id_incidencia = :id');
 $stmt_copiloto->execute([':id' => $id]);
 $copiloto = $stmt_copiloto->fetch(PDO::FETCH_ASSOC) ?: null;
 $feedback_copiloto = null;
@@ -228,6 +232,7 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>if (window.self !== window.top) document.documentElement.classList.add('en-vista-previa');</script>
     <title>TicketIA — Incidencia #<?= $id_incidencia ?></title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
     <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
@@ -285,6 +290,8 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
 
                 <section class="incidencia-box compact-box conversation-panel" id="conversacion">
                     <h2>Conversacion</h2>
+                    <?php if ($paginaMensajes['antes']): ?><a href="?id=<?= (int)$id ?>&amp;antes=<?= $paginaMensajes['antes'] ?>#conversacion">Cargar mensajes anteriores</a><?php endif; ?>
+                    <?php if (!empty($_GET['antes'])): ?><a href="?id=<?= (int)$id ?>#ultimoMensaje">Volver a los mas recientes</a><?php endif; ?>
                 <?php if (!empty($traduccion['mensajes'])): ?>
                     <div class="mensajes-grid">
                         <?php foreach ($traduccion['mensajes'] as $indice_mensaje => $mensaje): ?>
@@ -322,13 +329,14 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         <span>Borrador sugerido</span><p id="copilotRespuesta"><?= ui_e($copiloto['respuesta_sugerida'] ?? '') ?></p>
                         <?php if ($es_activa): ?><button type="button" class="card-button secondary-button" id="usarBorrador">Usar en respuesta</button><?php endif; ?>
                     </div>
-                    <details class="assistant-context"><summary>Contexto, confianza y valoracion</summary>
+                    <div id="copilotFuentes"><p class="help-line">Fuentes consultadas: revisa su aplicabilidad antes de enviar.</p><?php foreach ((json_decode($copiloto['fuentes_json'] ?? '[]', true) ?: []) as $fuente): if (!preg_match('/^(ayuda|ver_incidencia)\.php\?id=\d+$/D', $fuente['url'] ?? '')) continue; ?><p><a target="_blank" rel="noopener" href="<?= ui_e($fuente['url']) ?>"><?= ui_e($fuente['titulo']) ?></a></p><?php endforeach; ?></div>
+                    <details class="assistant-context"><summary>Contexto y valoracion</summary>
                     <div class="copilot-grid <?= $copiloto ? '' : 'is-empty' ?>" id="copilotGrid">
                         <div class="copilot-main"><span>Resumen ejecutivo</span><p id="copilotResumen"><?= $copiloto ? ui_e($copiloto['resumen']) : 'Genera el brief para convertir toda la conversacion en un contexto operativo compacto.' ?></p></div>
                         <div class="copilot-signal"><span>Riesgo</span><strong id="copilotRiesgo" class="risk-<?= ui_e($copiloto['riesgo'] ?? 'sin-datos') ?>"><?= ui_e(ucfirst($copiloto['riesgo'] ?? 'Sin datos')) ?></strong></div>
                         <div class="copilot-signal"><span>Sentimiento</span><strong id="copilotSentimiento"><?= ui_e(ucfirst($copiloto['sentimiento'] ?? 'Sin datos')) ?></strong></div>
                         <div class="copilot-next"><span>Siguiente mejor accion</span><p id="copilotAccion"><?= $copiloto ? ui_e($copiloto['siguiente_accion']) : 'Pendiente de analisis.' ?></p></div>
-                        <div class="copilot-confidence"><span>Confianza</span><strong id="copilotConfianza"><?= (int)($copiloto['confianza'] ?? 0) ?>%</strong></div>
+                        <p class="help-line">Propuesta de IA, no una certeza. Comprueba los datos y solicita la informacion que falte.</p>
                     </div>
                     <div class="copilot-feedback" id="copilotFeedback" <?= $copiloto ? '' : 'hidden' ?>>
                         <span>Este brief te ha ayudado?</span>
@@ -367,18 +375,24 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     </div>
                 </details>
 
+                    <p id="avisoActualizacion" class="alert alert-warning" <?= isset($_GET['conflicto']) || ($_GET['resolucion'] ?? '') === 'error' ? '' : 'hidden' ?>>La incidencia ha cambiado o no se pudo guardar. Tu borrador sigue siendo privado. Revisa la conversacion antes de volver a enviar.</p>
                     <form action="guardar_mensaje.php" method="POST" class="composer conversation-composer" id="formRespuesta">
+                        <input type="hidden" name="solicitud_id" value="<?= bin2hex(random_bytes(16)) ?>">
+                        <input type="hidden" name="huella" value="<?= ui_e($huella) ?>">
+                        <input type="hidden" name="borrador_version" value="<?= (int)$borrador['version'] ?>">
                         <div class="composer-heading"><label for="mensaje">Tu respuesta</label><button type="button" class="card-button secondary-button" id="generarCopiloto" data-id="<?= $id_incidencia ?>">Redactar con IA</button></div>
                         <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                         <input type="hidden" name="origen_ia" id="origenIa" value="">
                         <input type="hidden" name="contenido_hash_ia" id="contenidoHashIa" value="">
-                        <textarea name="mensaje" id="mensaje" rows="5" maxlength="30000" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
+                        <textarea name="mensaje" id="mensaje" rows="5" maxlength="30000" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"><?= ui_e($borrador['mensaje']) ?></textarea>
+                        <p class="help-line" id="estadoBorrador" role="status"><?= $borrador['version'] ? 'Borrador privado recuperado' : 'El borrador solo lo puedes ver tu.' ?></p>
+                        <details><summary>Respuestas reutilizables</summary><label for="respuestaRapida">Insertar texto</label><select id="respuestaRapida"><option value="">Seleccionar...</option><option value="Para poder ayudarte, indicanos los pasos para reproducir el problema y el mensaje de error exacto. No incluyas contrasenas ni datos sensibles.">Pedir informacion</option><option value="Hemos recibido la informacion. Vamos a revisarla y te mantendremos al tanto desde esta conversacion.">Confirmar recepcion</option><option value="Puedes comprobar si el problema se ha resuelto y confirmarnos el resultado?">Solicitar comprobacion</option></select></details>
                         <div class="composer-row">
                             <label class="reply-action-label" for="accionRespuesta">Al enviar</label>
                             <select name="accion_respuesta" id="accionRespuesta" aria-describedby="respuestaAyuda">
-                                <option value="responder">Responder al cliente</option>
-                                <option value="resolver">Proponer solucion</option>
-                                <option value="nota">Guardar nota interna</option>
+                                <option value="responder" <?= $borrador['accion'] === 'responder' ? 'selected' : '' ?>>Responder al cliente</option>
+                                <option value="resolver" <?= $borrador['accion'] === 'resolver' ? 'selected' : '' ?>>Proponer solucion</option>
+                                <option value="nota" <?= $borrador['accion'] === 'nota' ? 'selected' : '' ?>>Guardar nota interna</option>
                             </select>
                             <button type="submit" class="card-button" id="enviarRespuesta">Enviar respuesta</button>
                         </div>
@@ -644,7 +658,18 @@ document.addEventListener('DOMContentLoaded', () => {
         riesgo.className = 'risk-' + (insight.riesgo || 'medio');
         document.getElementById('copilotSentimiento').textContent = (insight.sentimiento || 'neutral').replace(/^./, (c) => c.toUpperCase());
         document.getElementById('copilotAccion').textContent = insight.siguiente_accion || '';
-        document.getElementById('copilotConfianza').textContent = `${parseInt(insight.confianza || 0, 10)}%`;
+        const fuentes = document.getElementById('copilotFuentes');
+        fuentes.replaceChildren();
+        const titulo = document.createElement('p');
+        titulo.textContent = insight.fuentes?.length ? 'Fuentes consultadas (comprueba que se aplican):' : 'Sin fuentes recuperadas. Pide informacion antes de asumir una solucion.';
+        fuentes.append(titulo);
+        (insight.fuentes || []).forEach(fuente => {
+            if (!/^(ayuda|ver_incidencia)\.php\?id=\d+$/.test(fuente.url)) return;
+            const enlace = document.createElement('a');
+            enlace.href = fuente.url; enlace.textContent = fuente.titulo;
+            enlace.target = '_blank'; enlace.rel = 'noopener';
+            const fila = document.createElement('p'); fila.append(enlace); fuentes.append(fila);
+        });
         copilotRespuesta.textContent = insight.respuesta_sugerida || '';
         document.getElementById('copilotDraft').hidden = !insight.respuesta_sugerida;
         document.getElementById('copilotGrid').classList.remove('is-empty');
@@ -686,6 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!mensaje) return;
             if (mensaje.value.trim() && !window.confirm('Sustituir el texto que ya has escrito por el borrador de IA?')) return;
             mensaje.value = copilotRespuesta.textContent.trim();
+            mensaje.dispatchEvent(new Event('input', {bubbles: true}));
             document.getElementById('respuestaAyuda').textContent = 'Borrador de IA sin enviar. Revisalo y pulsa el boton de envio para guardarlo en la conversacion.';
             copilotCard.open = false;
             if (origenIa) origenIa.value = 'copiloto';
@@ -719,6 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('opcionesResolucion').hidden = accion !== 'resolver';
         document.getElementById('formRespuesta').classList.toggle('is-internal', accion === 'nota');
     });
+    document.getElementById('accionRespuesta')?.dispatchEvent(new Event('change'));
     document.getElementById('formRespuesta')?.addEventListener('submit', () => {
         const boton = document.getElementById('enviarRespuesta');
         boton.disabled = true;
@@ -757,5 +784,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 </script>
+<?php if (soporte_esquema_disponible($pdo)): ?><script src="soporte.js?v=<?= (int)filemtime(__DIR__ . '/soporte.js') ?>"></script><?php endif; ?>
 </body>
 </html>

@@ -24,6 +24,22 @@ function correo_url_base(): string {
  * acepto el envio. Nunca lanza excepciones.
  */
 function correo_enviar(array $destinatarios, string $asunto, string $html): bool {
+    global $pdo;
+    if (!correo_activo() || $destinatarios === []) return false;
+    try {
+        // Un trabajo por destinatario: nunca expone direcciones entre clientes.
+        foreach ($destinatarios as $destinatario) {
+            trabajos_encolar($pdo, 'correo', ['destinatarios' => [$destinatario], 'asunto' => $asunto, 'html' => $html], 5);
+        }
+        return true;
+    } catch (Throwable $e) {
+        error_log('TicketIA: no se pudo encolar la notificacion de correo.');
+        return false;
+    }
+}
+
+/** SMTP es entrega al menos una vez; Message-ID estable ayuda a identificar reintentos. */
+function correo_enviar_directo(array $destinatarios, string $asunto, string $html, string $identificador = ''): bool {
     if (!correo_activo() || $destinatarios === []) {
         return false;
     }
@@ -35,6 +51,7 @@ function correo_enviar(array $destinatarios, string $asunto, string $html): bool
         $mail->Host = (string)entorno_valor('SMTP_HOST', '');
         $mail->Port = (int)entorno_valor('SMTP_PORT', 587);
         $mail->Timeout = 10;
+        if ($identificador !== '') $mail->MessageID = '<' . $identificador . '@ticketia.local>';
 
         $usuario = trim((string)entorno_valor('SMTP_USER', ''));
         if ($usuario !== '') {

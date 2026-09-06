@@ -140,6 +140,7 @@ function ui_render_kanban_card(array $incidencia, array $asignables = [], bool $
                     </select>
                 </form>
                 <span class='assignment-status' aria-live='polite'></span>
+                <button type='button' class='asignarme-link' data-asignarme='" . (int)(auth_usuario()['id'] ?? 0) . "'>Asignarme</button>
             </div>
             <details class='kanban-controls-disclosure'>
                 <summary>Departamento</summary>
@@ -227,9 +228,12 @@ function ui_render_timeline_item(array $event): string {
 function ui_admin_nav(string $activa): string {
     $tabs = [
         'admin_inicio.php' => ['Vista general', 'Prioridades y salud del servicio', 'panel', 'Gestion'],
+        'admin_operacion.php' => ['Necesita atencion', 'Entregas, salud y conservacion', 'flujo', 'Gestion'],
         'admin_usuarios.php' => ['Personas y acceso', 'Usuarios, roles y contrasenas', 'personas', 'Gestion'],
         'admin_clientes.php' => ['Organizaciones', 'Empresas y niveles de servicio', 'empresa', 'Gestion'],
         'admin_flujos.php' => ['Ciclo de vida', 'Resolucion, cierre y archivo', 'flujo', 'Servicio'],
+        'admin_reglas.php' => ['Equipos y reparto', 'Simular antes de automatizar', 'personas', 'Servicio'],
+        'admin_calendario.php' => ['Horario de servicio', 'Jornada, festivos y simulacion', 'historial', 'Servicio'],
         'admin_conocimiento.php' => ['Conocimiento', 'Articulos y autoservicio', 'libro', 'Servicio'],
         'admin_catalogo.php' => ['Catalogo comercial', 'Productos para el asistente', 'catalogo', 'Servicio'],
         'ver_logs_llm.php' => ['Control de IA', 'Calidad, consumo y errores', 'ia', 'Plataforma'],

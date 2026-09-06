@@ -10,6 +10,11 @@ function conocimiento_disponible(PDO $pdo): bool {
     }
 }
 
+function conocimiento_valoraciones_disponibles(PDO $pdo): bool {
+    try { $pdo->query('SELECT articulo_id FROM conocimiento_valoraciones LIMIT 0'); return true; }
+    catch (PDOException $e) { return false; }
+}
+
 function conocimiento_validar(array $datos): ?string {
     foreach (['titulo' => 180, 'resumen' => 400, 'contenido' => 30000, 'categoria' => 80] as $campo => $limite) {
         $texto = trim((string)($datos[$campo] ?? ''));
