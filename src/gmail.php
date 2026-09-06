@@ -1,8 +1,22 @@
 <?php
 // Entrada en cuarentena: From no demuestra identidad y nunca autoriza acceso por si solo.
 function gmail_disponible(PDO $pdo): bool {
-    try { $pdo->query('SELECT mensaje_id FROM gmail_entradas LIMIT 0'); return true; }
+    try { $pdo->query('SELECT mensaje_id FROM gmail_entradas LIMIT 0'); $pdo->query('SELECT cursor_pagina FROM gmail_sincronizacion LIMIT 0'); return true; }
     catch (PDOException $e) { return false; }
+}
+
+/** Solo devuelve estados y nombres de variables, nunca valores privados. */
+function gmail_diagnostico(callable $leer, bool $curlDisponible): array {
+    $faltan=[];
+    foreach (['GMAIL_CLIENT_ID','GMAIL_CLIENT_SECRET','GMAIL_REFRESH_TOKEN','GMAIL_BUZON','GMAIL_LABEL_ID'] as $clave) {
+        if (trim((string)$leer($clave))==='') $faltan[]=$clave;
+    }
+    $invalidos=[];
+    $buzon=trim((string)$leer('GMAIL_BUZON'));
+    $etiqueta=trim((string)$leer('GMAIL_LABEL_ID'));
+    if ($buzon!=='' && !filter_var($buzon,FILTER_VALIDATE_EMAIL)) $invalidos[]='GMAIL_BUZON';
+    if ($etiqueta!=='' && !preg_match('/^[A-Za-z0-9_-]{1,100}$/D',$etiqueta)) $invalidos[]='GMAIL_LABEL_ID';
+    return ['completo'=>!$faltan && !$invalidos && $curlDisponible,'faltan'=>$faltan,'invalidos'=>$invalidos,'curl'=>$curlDisponible];
 }
 
 function gmail_http(string $url, ?array $formulario = null, string $token = ''): array {

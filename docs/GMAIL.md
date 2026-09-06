@@ -18,7 +18,11 @@
    debe ser la direccion principal que devuelve el perfil de la cuenta autorizada.
    Protege el archivo con permisos del usuario del servicio.
 5. Aplica las migraciones pendientes con copia previa (la 19 crea la bandeja).
-   Ejecuta `php bin/sincronizar_gmail.php`. Revisa primero un lote y luego, si
+   Ejecuta primero `php bin/sincronizar_gmail.php --comprobar`: valida el esquema,
+   las variables requeridas, los formatos locales y cURL sin contactar con Google
+   ni importar correos. Devuelve codigo 1 si falta algo; nunca muestra secretos.
+   Configuracion completa no significa que OAuth este autorizado o vigente.
+   Despues ejecuta `php bin/sincronizar_gmail.php`. Revisa primero un lote y luego, si
    procede, programa el comando en el planificador del servidor.
 
 Documentacion oficial: [listar mensajes](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list),
@@ -29,6 +33,9 @@ Documentacion oficial: [listar mensajes](https://developers.google.com/workspace
 
 El alcance readonly permite leer el buzon: la etiqueta limita lo que importa este
 programa, pero no reduce el permiso concedido por Google. Utiliza un buzon dedicado.
+La bandeja de administracion tambien muestra el diagnostico local y los pasos
+pendientes, sin mostrar valores privados. El PHP web y el de consola pueden usar
+configuraciones diferentes: comprueba ambos entornos.
 Google puede imponer requisitos de verificacion y politicas segun la audiencia y
 el estado de la aplicacion OAuth. Revisa esos requisitos con el administrador.
 

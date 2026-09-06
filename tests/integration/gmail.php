@@ -13,6 +13,8 @@ function probar_gmail(PDO $pdo, string $cliente): void {
     $id=(int)$pdo->query("SELECT id FROM gmail_entradas WHERE mensaje_id='correo_prueba_1'")->fetchColumn();
     comprobar((int)$pdo->query("SELECT COUNT(*) FROM incidencias WHERE titulo='GMAIL_PRUEBA_AISLADA'")->fetchColumn()===0,'No crea incidencias antes de aprobar');
     [, $html]=peticion("admin_correo_entrante.php?ver=$id",$admin);$token=csrf($html);
+    comprobar(str_contains($html,'Esta comprobacion no contacta con Google'),'Diagnostico no presenta configuracion como conexion verificada');
+    comprobar(str_contains($html,'sincronizar_gmail.php --comprobar'),'Administracion muestra comprobacion local sin importar correo');
     [$codigo,$html]=peticion("admin_correo_entrante.php?ver=$id",$admin,['id'=>$id,'accion'=>'importar','csrf'=>$token]);
     comprobar(str_contains($html,'Confirma que has verificado'),'Importacion exige confirmar identidad');
     foreach([$agente,$cliente]as$jar){[$codigo]=peticion('admin_correo_entrante.php',$jar);comprobar($codigo===403,'Entrada de correo solo para administracion');}

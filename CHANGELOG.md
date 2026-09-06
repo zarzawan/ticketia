@@ -10,6 +10,8 @@
   Respuestas supervisadas sobre el mismo hilo, visibles en la conversacion,
   con aislamiento por cliente y retorno desde Esperando al cliente a En trabajo.
   No reabre incidencias cerradas. Requiere consentimiento del propietario.
+  Diagnostico local en administracion y CLI --comprobar, sin contactar con Google
+  ni mostrar credenciales; distingue configuracion de autorizacion verificada.
 
 - IA bajo demanda en predicciones, redaccion de respuestas compartidas y
   organizacion del reparto. Validacion estructurada, cache privada y propuestas
