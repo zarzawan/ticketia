@@ -465,7 +465,7 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TicketIA — Analisis IA</title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
 <body class="support-body">
 <div class="support-shell">

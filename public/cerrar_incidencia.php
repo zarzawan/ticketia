@@ -20,5 +20,5 @@ if (!incidencia_resolver($pdo, $id_incidencia, $codigo, $notas)) {
 }
 auditar($pdo, 'resolver_incidencia', "incidencia #$id_incidencia ($codigo)");
 
-header("Location: ver_incidencia.php?id=" . $id_incidencia . '&resolucion=ok');
+header("Location: ver_incidencia.php?id=" . $id_incidencia . '&resolucion=ok#ultimoMensaje');
 exit;

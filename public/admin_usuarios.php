@@ -241,7 +241,12 @@ if ($filtro_estado === 'activos') {
 } elseif ($filtro_estado === 'bloqueados') {
     $sql .= " AND u.bloqueado_hasta IS NOT NULL AND u.bloqueado_hasta > NOW()";
 }
-$sql .= " ORDER BY u.nombre";
+$conteo = $pdo->prepare('SELECT COUNT(*) FROM usuarios u LEFT JOIN clientes c ON c.id=u.cliente_id ' . substr($sql, strpos($sql, 'WHERE 1=1')));
+$conteo->execute($params);
+$total_usuarios = (int)$conteo->fetchColumn();
+$pagina = min(max(1, (int)($_GET['pagina'] ?? 1)), max(1, (int)ceil($total_usuarios / 25)));
+$offset = ($pagina - 1) * 25;
+$sql .= " ORDER BY u.nombre, u.id LIMIT 25 OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -265,7 +270,7 @@ if ($editar_id) {
     $editando = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_usuarios.php');
+ui_admin_cabecera('Personas y acceso', 'Gestiona el equipo y las cuentas de tus clientes.', 'admin_usuarios.php');
 ?>
 
 <?php if ($aviso !== ''): ?><div class="success-message"><?= ui_e($aviso) ?></div><?php endif; ?>
@@ -283,7 +288,8 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
     <div class="stat <?= (int)$stats['bloqueados'] > 0 ? 'stat-alerta' : '' ?>"><span class="stat-value"><?= (int)$stats['bloqueados'] ?></span><span class="stat-label">Bloqueados</span></div>
 </section>
 
-<div class="incidencia-box compact-box">
+<details class="incidencia-box compact-box admin-editor" <?= $editando || $error !== '' || isset($_GET['nuevo']) ? 'open' : '' ?>>
+    <summary><?= $editando ? 'Editar cuenta' : '+ Crear usuario' ?><span>Identidad, permisos y acceso</span></summary>
     <div class="section-head">
         <h2><?= $editando ? 'Editar usuario' : 'Crear usuario' ?></h2>
         <?php if ($editando): ?>
@@ -347,20 +353,20 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
             <button type="submit" class="filter-button"><?= $editando ? 'Guardar cambios' : 'Crear' ?></button>
         </div>
     </form>
-</div>
+</details>
 
 <div class="incidencia-box compact-box">
     <div class="section-head">
-        <h2>Cuentas (<?= count($usuarios) ?>)</h2>
+        <h2>Directorio <span class="record-count"><?= $total_usuarios ?></span></h2>
         <form method="GET" class="page-tools">
-            <input type="text" name="q" placeholder="Buscar nombre o email" value="<?= ui_e($filtro_q) ?>" style="max-width:220px;">
-            <select name="rol" onchange="this.form.submit()">
+            <input type="search" name="q" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email" value="<?= ui_e($filtro_q) ?>">
+            <select name="rol" aria-label="Filtrar por rol" onchange="this.form.submit()">
                 <option value="">Todos los roles</option>
                 <?php foreach ($roles_validos as $r): ?>
                     <option value="<?= $r ?>" <?= $filtro_rol === $r ? 'selected' : '' ?>><?= ucfirst($r) ?></option>
                 <?php endforeach; ?>
             </select>
-            <select name="estado" onchange="this.form.submit()">
+            <select name="estado" aria-label="Filtrar por estado" onchange="this.form.submit()">
                 <option value="">Todos</option>
                 <option value="activos" <?= $filtro_estado === 'activos' ? 'selected' : '' ?>>Activos</option>
                 <option value="desactivados" <?= $filtro_estado === 'desactivados' ? 'selected' : '' ?>>Desactivados</option>
@@ -369,7 +375,8 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
             <button type="submit" class="card-button secondary-button">Filtrar</button>
         </form>
     </div>
-    <table class="logs-table">
+    <?php if (!$usuarios): ?><div class="admin-empty"><strong>No hay cuentas en esta vista</strong><span>Prueba con otro filtro o crea un usuario.</span><a href="admin_usuarios.php">Limpiar filtros</a></div><?php endif; ?>
+    <div class="table-scroll"><table class="logs-table">
         <thead>
             <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Empresa</th><th>Estado</th><th>2FA</th><th>Tickets abiertos</th><th>Ultimo acceso</th><th>Acciones</th></tr>
         </thead>
@@ -391,6 +398,7 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
                     <td>
                         <div class="usuarios-acciones">
                             <a class="card-button secondary-button boton-mini" href="admin_usuarios.php?editar=<?= (int)$u['id'] ?>">Editar</a>
+                            <details class="record-actions"><summary>Acceso y seguridad</summary><div class="record-actions-content">
                             <?php if ($bloqueado): ?>
                                 <form method="POST">
                                     <?= csrf_campo() ?>
@@ -432,12 +440,14 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
                                     <button type="submit" class="card-button secondary-button boton-mini">Quitar 2FA</button>
                                 </form>
                             <?php endif; ?>
+                            </div></details>
                         </div>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
+    <?= ui_paginacion($pagina, $total_usuarios, 25, ['q'=>$filtro_q,'rol'=>$filtro_rol,'estado'=>$filtro_estado]) ?>
 </div>
 
 <?php ui_admin_pie(); ?>

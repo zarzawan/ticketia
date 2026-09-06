@@ -22,7 +22,8 @@ if (isset($_GET['filtro_asignado'])) {
     }
 }
 
-$sql = "SELECT id, titulo, descripcion, resumen, tipo, urgencia, estado, idioma, (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre, fecha_creacion, fecha_cierre FROM incidencias WHERE 1=1";
+$fuente = bandeja_fuente_sql($pdo);
+$sql = "SELECT id, titulo, descripcion, resumen, tipo, urgencia, estado, idioma, asignado_nombre, fecha_creacion, fecha_cierre FROM $fuente WHERE 1=1";
 $params = [];
 dominio_append_filtros($sql, $params, [
     'busqueda' => $busqueda,
@@ -36,11 +37,11 @@ dominio_append_filtros($sql, $params, [
 if ($filtro_estado === '') {
     $sql .= " AND estado IN ('abierta','en_curso')";
 }
-$sql .= ' ORDER BY ' . dominio_order_by($orden);
+bandeja_append_cola($sql, (string)($_GET['cola'] ?? ''));
+$sql .= ' ORDER BY ' . bandeja_orden_sql((string)($_GET['orden_columna'] ?? ''), (string)($_GET['direccion'] ?? 'desc'), $orden);
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $filename = 'incidencias_filtradas_' . date('Y-m-d_H-i-s') . '.csv';
 header('Content-Type: text/csv; charset=utf-8');
@@ -62,7 +63,7 @@ fputcsv($output, [
     'Fecha cierre'
 ], ';');
 
-foreach ($rows as $row) {
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     fputcsv($output, [
         $row['id'] ?? '',
         $row['titulo'] ?? '',

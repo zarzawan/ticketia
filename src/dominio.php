@@ -425,38 +425,37 @@ function incidencia_cambiar_estado(PDO $pdo, int $id_incidencia, string $nuevo_e
 /** Propone una solucion y detiene el SLA a la espera de confirmacion. */
 function incidencia_resolver(PDO $pdo, int $id_incidencia, string $codigo, string $notas): bool {
     $notas = trim($notas);
-    if (!isset(dominio_codigos_resolucion()[$codigo]) || $notas === '') {
-        return false;
-    }
-
-    $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
-    $stmt->execute([':id' => $id_incidencia]);
-    $actual = $stmt->fetchColumn();
-    if ($actual === false || !in_array((string)$actual, dominio_estados_activos(), true)) {
-        return false;
-    }
-
+    if (!isset(dominio_codigos_resolucion()[$codigo]) || $notas === '' || mb_strlen($notas) > 30000) return false;
     $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
-    $pdo->prepare(
-        "UPDATE incidencias
-         SET estado = 'resuelta', fecha_resolucion = NOW(), fecha_cierre = NULL,
-             resolucion_codigo = :codigo, resolucion_notas = :notas,
-             resuelto_por = :usuario, fecha_archivo = NULL
-         WHERE id = :id"
-    )->execute([
-        ':codigo' => $codigo,
-        ':notas' => $notas,
-        ':usuario' => $usuario['id'] ?? null,
-        ':id' => $id_incidencia,
-    ]);
-    $pdo->prepare(
-        "INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
-         VALUES (:id, :usuario, :anterior, 'resuelta')"
-    )->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null, ':anterior' => $actual]);
-
-    if (function_exists('correo_notificar_estado')) {
-        correo_notificar_estado($pdo, $id_incidencia, (string)$actual, 'resuelta');
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id FOR UPDATE");
+        $stmt->execute([':id' => $id_incidencia]);
+        $actual = $stmt->fetchColumn();
+        if ($actual === false || !in_array((string)$actual, dominio_estados_activos(), true)) {
+            $pdo->rollBack();
+            return false;
+        }
+        $pdo->prepare(
+            "UPDATE incidencias SET estado = 'resuelta', fecha_resolucion = NOW(), fecha_cierre = NULL,
+             resolucion_codigo = :codigo, resolucion_notas = :notas, resuelto_por = :usuario, fecha_archivo = NULL WHERE id = :id"
+        )->execute([':codigo' => $codigo, ':notas' => $notas, ':usuario' => $usuario['id'] ?? null, ':id' => $id_incidencia]);
+        $pdo->prepare(
+            "INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
+             VALUES (:id, :usuario, :anterior, 'resuelta')"
+        )->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null, ':anterior' => $actual]);
+        // La solucion forma parte de la conversacion y sobrevive a una reapertura.
+        $pdo->prepare(
+            "INSERT INTO mensajes (id_incidencia, usuario_id, autor, mensaje, interno, fecha)
+             VALUES (:id, :usuario, 'tecnico', :mensaje, 0, NOW())"
+        )->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null, ':mensaje' => "Solucion propuesta:\n\n" . $notas]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('TicketIA: no se pudo guardar la solucion y su mensaje.');
+        return false;
     }
+    if (function_exists('correo_notificar_estado')) correo_notificar_estado($pdo, $id_incidencia, (string)$actual, 'resuelta');
     return true;
 }
 

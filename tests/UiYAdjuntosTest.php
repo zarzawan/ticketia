@@ -59,7 +59,12 @@ final class UiYAdjuntosTest extends TestCase
         $this->assertStringContainsString("form='formAccionesMasivas'", $html);
         $this->assertStringContainsString("name='ids[]'", $html);
         $this->assertStringContainsString("class='kanban-controls-disclosure'", $html);
-        $this->assertStringContainsString('<summary>Ajustar</summary>', $html);
+        $this->assertStringContainsString('<summary>Departamento</summary>', $html);
+        $dom = new DOMDocument();
+        @$dom->loadHTML($html);
+        $xpath = new DOMXPath($dom);
+        $this->assertSame(1, $xpath->query("//select[@name='asignado' and not(ancestor::details)]")->length);
+        $this->assertSame(0, $xpath->query("//details//select[@name='asignado']")->length);
     }
 
     public function testActividadPuedeDesplegarElContenidoSinSaltarDeSeccion(): void

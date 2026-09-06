@@ -15,6 +15,7 @@ if (!$id) {
     echo json_encode(['ok' => false, 'error' => 'Incidencia no valida']);
     exit;
 }
+gobierno_ia_contexto_establecer((int)$id);
 
 $stmt = $pdo->prepare('SELECT id, titulo, descripcion, estado, urgencia, tipo, resumen, recomendacion FROM incidencias WHERE id = :id');
 $stmt->execute([':id' => $id]);
@@ -36,6 +37,7 @@ if (!$forzar) {
     $stmt->execute([':id' => $id, ':hash' => $hash]);
     $cache = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($cache) {
+        $cache['contenido_hash'] = $hash;
         echo json_encode(['ok' => true, 'cache' => true, 'insight' => $cache], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -89,5 +91,6 @@ $stmt->execute([
 ]);
 auditar($pdo, 'copiloto_ia', "incidencia #$id");
 $insight['actualizado_en'] = date('Y-m-d H:i:s');
+$insight['contenido_hash'] = $hash;
 echo json_encode(['ok' => true, 'cache' => false, 'insight' => $insight], JSON_UNESCAPED_UNICODE);
 exit;

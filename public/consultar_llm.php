@@ -3,6 +3,7 @@ require_once __DIR__ . '/../src/arranque.php';
 
 // Obtener ID de incidencia
 $id_incidencia = isset($_GET['id']) ? intval($_GET['id']) : 0;
+gobierno_ia_contexto_establecer($id_incidencia);
 
 // Obtener la fecha, hora y huso horario actuales
 date_default_timezone_set('Europe/Madrid');
@@ -162,7 +163,7 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resumen de la incidencia #<?php echo $id_incidencia; ?></title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
 <body>
 <div class="container">
@@ -345,8 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
-
 
 
 

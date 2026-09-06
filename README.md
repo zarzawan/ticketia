@@ -134,6 +134,8 @@ con valores por defecto y puedes clasificarlos a mano o re-clasificarlos con IA 
 
 Control de coste: `LLM_SOLO_LOCAL=1` ignora los proveedores de pago aunque haya claves, y
 `LLM_MAX_LLAMADAS_DIA` corta las llamadas de pago al alcanzar el cupo diario.
+`LLM_LOG_RETENTION_DIAS` define cuantos dias se conservan las trazas; el worker
+elimina los registros antiguos por lotes.
 
 ## Worker de trabajos IA
 
@@ -148,6 +150,18 @@ php bin/worker.php --bucle    # en bucle continuo (servicio)
 
 En Docker, el servicio `worker` ejecuta el bucle de forma permanente y se recupera de
 reinicios. Se inicia después del instalador con `docker compose up -d worker`.
+
+Administración, Configuración y Control IA muestran su última señal real. El CLI
+registra actividad al arrancar, entre trabajos (como máximo cada 15 segundos) y
+al terminar una ejecución puntual. La cola vacía y el botón de procesado manual
+no se interpretan como prueba de automatización activa.
+
+`WORKER_ALERTA_SEGUNDOS` (600 por defecto, de 60 a 86400) controla el aviso de falta
+de actividad. Debe superar el intervalo programado y la duración máxima de una
+tarea. «Actividad reciente» no garantiza que el proceso siga vivo ni que sus
+trabajos hayan tenido éxito; comprueba también los fallidos y los registros.
+El aviso aparece al cargar el panel: no envía notificaciones externas ni arranca
+el servicio. El registro reutiliza una única clave de `ajustes`, sin migración.
 
 ## Notificaciones por email (opcional)
 
@@ -168,11 +182,38 @@ No cambies esa clave después de activar 2FA: protege los secretos cifrados alma
 la base de datos. La recuperación de contraseña utiliza SMTP, enlaces de 30 minutos,
 tokens almacenados como hash y revocación de las sesiones anteriores.
 
+## Administración y centro de ayuda
+
+La administración agrupa personas, organizaciones, servicio e IA. El portal
+separa solicitudes en seguimiento, respuestas, soluciones por confirmar e historial.
+Los directorios cargan 25 filas por página y el portal usa paginación por cursor.
+
+En **Administración → Conocimiento** se crean guías internas o para clientes.
+La IA puede preparar un borrador a partir de una incidencia resuelta; una persona
+debe revisar el contenido y confirmar su publicación. Solo los artículos publicados
+para clientes aparecen en su portal y en las sugerencias al crear una solicitud.
+El solicitante puede valorar la atención una vez resuelta su incidencia.
+
+Consulta [las decisiones del rediseño](docs/REDISENO_2026.md) para el alcance,
+las referencias de producto y las siguientes prioridades.
+
 ## Tests
 
 ```bash
 vendor/bin/phpunit
 ```
+
+Para comprobar flujos completos con MariaDB local y una IA simulada:
+
+```bash
+php tests/integration/experiencia.php
+```
+
+Usa una cuenta con permiso de crear bases mediante `TEST_DB_USER` y
+`TEST_DB_PASS` (por defecto root local sin contraseña). El ensayo crea y elimina
+su propia base `ticketia_pruebas_*` y usa los puertos 8091 y 8092; no siembra ni
+modifica la base de desarrollo. Con `--visual` en una terminal interactiva,
+mantiene el entorno hasta pulsar Enter para revisar las pantallas.
 
 La CI de GitHub Actions ejecuta lint, tests (PHP 8.2–8.3), escaneo de secretos y una
 prueba de humo Docker completa: levanta la pila, comprueba extensiones, instala el

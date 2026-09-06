@@ -12,7 +12,7 @@ $pagina_retorno = auth_es('cliente') ? 'portal.php' : 'index.php';
 $titulo = trim((string)($_POST['titulo'] ?? ''));
 $descripcion = trim((string)($_POST['descripcion'] ?? ''));
 
-if ($titulo === '' || $descripcion === '') {
+if ($titulo === '' || $descripcion === '' || mb_strlen($titulo) > 255 || mb_strlen($descripcion) > 30000) {
     header("Location: $pagina_retorno?error=1");
     exit;
 }
@@ -34,6 +34,7 @@ $stmt->execute([
 ]);
 
 $id_incidencia = (int)$pdo->lastInsertId();
+gobierno_ia_contexto_establecer($id_incidencia);
 auditar($pdo, 'crear_incidencia', "incidencia #$id_incidencia: $titulo");
 
 // --- Fase 2: responder ya al usuario y clasificar en segundo plano ---

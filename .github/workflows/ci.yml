@@ -38,6 +38,32 @@ jobs:
       - name: Tests unitarios
         run: vendor/bin/phpunit
 
+  experiencia:
+    name: Flujos HTTP y aislamiento de clientes
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ticketia_pruebas_ci
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, curl, mbstring, fileinfo, openssl
+          coverage: none
+      - run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Verificar flujos con IA simulada y base desechable
+        run: php tests/integration/experiencia.php
+        env:
+          TEST_DB_USER: root
+          TEST_DB_PASS: ticketia_pruebas_ci
+
   secretos:
     name: Escaneo de secretos (gitleaks)
     runs-on: ubuntu-latest

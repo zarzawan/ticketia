@@ -22,9 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($accion === 'purgar_logs') {
-        $borrados = $pdo->exec("DELETE FROM llm_logs WHERE fecha < NOW() - INTERVAL 30 DAY");
+        $borrados = gobierno_ia_mantenimiento($pdo);
         auditar($pdo, 'purgar_logs_ia', "$borrados registros");
-        $aviso = "Eliminados $borrados registros de actividad IA anteriores a 30 dias.";
+        $aviso = "Eliminados $borrados registros de actividad IA segun la retencion de " . gobierno_ia_retencion_dias() . ' dias.';
     }
 
     if ($accion === 'procesar_cola') {
@@ -103,6 +103,7 @@ $contadores = $pdo->query(
 $extensiones = ['pdo_mysql', 'curl', 'mbstring', 'fileinfo', 'openssl'];
 
 $cola = trabajos_estado($pdo);
+$salud_worker = trabajos_worker_salud($pdo);
 $limite_dia = (int)entorno_valor('LLM_MAX_LLAMADAS_DIA', 0);
 $llamadas_pago_hoy = (int)$pdo->query(
     "SELECT COUNT(*) FROM llm_logs WHERE proveedor <> 'local' AND DATE(fecha) = CURDATE()"
@@ -114,15 +115,16 @@ $politicas_sla = $pdo->query(
               FIELD(urgencia, 'critico', 'urgente', 'leve')"
 )->fetchAll(PDO::FETCH_ASSOC);
 
-ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del sistema.', 'admin_ajustes.php');
+ui_admin_cabecera('Configuracion', 'Define como trabaja tu servicio: IA, compromisos y mantenimiento.', 'admin_ajustes.php');
 ?>
 
 <?php if ($aviso !== ''): ?><div class="success-message"><?= ui_e($aviso) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="login-error"><?= ui_e($error) ?></div><?php endif; ?>
 
+<nav class="service-subnav" aria-label="Secciones de configuracion"><a href="#configIA">Inteligencia artificial</a><a href="#configSLA">Compromisos SLA</a><a href="#configSistema">Sistema</a><a href="#configMantenimiento">Mantenimiento</a></nav>
 <div class="split-2">
     <div class="incidencia-box compact-box">
-        <h2>Inteligencia artificial</h2>
+        <h2 id="configIA">Inteligencia artificial</h2>
         <div class="detail-list">
             <div class="detail-row">
                 <span>Proveedor activo</span>
@@ -161,6 +163,7 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
         <p class="help-line">Los endpoints y claves se configuran en el fichero .env; los cambios de proveedor hechos aqui se guardan en la base de datos.</p>
 
         <h2 style="margin-top:18px;">Cola de trabajos IA</h2>
+        <?= ui_worker_estado($salud_worker) ?>
         <div class="detail-list">
             <div class="detail-row"><span>Pendientes</span><strong><?= (int)($cola['pendiente'] ?? 0) ?></strong></div>
             <div class="detail-row"><span>En curso</span><strong><?= (int)($cola['en_curso'] ?? 0) ?></strong></div>
@@ -186,10 +189,11 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
             <?php endif; ?>
         </div>
         <p class="help-line">Para procesado automatico programa <code>php bin/worker.php</code> (cron o Programador de tareas), o dejalo en bucle con <code>--bucle</code>.</p>
+        <p class="help-line">Alerta tras <?= trabajos_worker_umbral() ?> segundos sin senal. Configura <code>WORKER_ALERTA_SEGUNDOS</code> por encima del intervalo programado y la duracion maxima de una tarea. Procesar manualmente no confirma que la automatizacion funcione.</p>
     </div>
 
     <div class="incidencia-box compact-box">
-        <h2>Sistema</h2>
+        <h2 id="configSistema">Sistema</h2>
         <div class="detail-list">
             <div class="detail-row"><span>Version de PHP</span><strong><?= ui_e(PHP_VERSION) ?></strong></div>
             <div class="detail-row"><span>Base de datos</span><strong><?= ui_e((string)$version_bd) ?></strong></div>
@@ -220,7 +224,7 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
 
 <div class="incidencia-box compact-box">
     <div class="section-head">
-        <div><h2>Politicas SLA</h2><p class="help-line">Los objetivos se miden en horas naturales. Una regla de tipo concreto prevalece sobre la regla general del nivel.</p></div>
+        <div><h2 id="configSLA">Compromisos de servicio (SLA)</h2><p class="help-line">Define cuanto tiempo tiene el equipo para responder y resolver. Los objetivos se miden en horas naturales; las excepciones por tipo prevalecen sobre la regla general.</p></div>
     </div>
     <form method="POST" class="filter-form-modern">
         <?= csrf_campo() ?>
@@ -284,12 +288,12 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
 </div>
 
 <div class="incidencia-box compact-box">
-    <h2>Mantenimiento</h2>
+    <h2 id="configMantenimiento">Mantenimiento</h2>
     <div class="page-tools">
-        <form method="POST" onsubmit="return confirm('Eliminar los registros de actividad IA de mas de 30 dias?');">
+        <form method="POST" onsubmit="return confirm('Eliminar un lote de registros que superan la retencion configurada?');">
             <?= csrf_campo() ?>
             <input type="hidden" name="accion" value="purgar_logs">
-            <button type="submit" class="card-button secondary-button">Purgar actividad IA (+30 dias)</button>
+            <button type="submit" class="card-button secondary-button">Purgar actividad IA (+<?= gobierno_ia_retencion_dias() ?> dias)</button>
         </form>
         <a class="card-button secondary-button" href="reprocesar_incidencias.php">Clasificar incidencias pendientes</a>
         <a class="card-button secondary-button" href="reprocesar_incidencias.php?todas=1" onclick="return confirm('Re-clasificar TODAS las incidencias con IA? Puede tardar y consumir tokens.');">Re-clasificar todo el historico</a>

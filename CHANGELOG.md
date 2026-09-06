@@ -4,6 +4,27 @@
 
 ### Mejorado
 
+- Soporte simplificado: Kanban por defecto, tecnico asignable directamente desde
+  cada tarjeta, busqueda visible y filtros secundarios sin decenas de botones.
+- Un unico editor para respuesta, solucion o nota interna, con borrador IA revisable.
+- Al proponer una solucion se guarda un mensaje publico de forma atomica con el
+  cambio de estado; el comentario se conserva al reabrir y no se duplica al reenviar.
+- Bandeja con filtros SLA y ordenacion global antes de paginar; lista y columnas
+  Kanban permiten recorrer todos los resultados. CSV respeta la cola seleccionada.
+- Estado del procesador automatico basado en actividad real del CLI, con aviso
+  configurable por ausencia de senal y distincion del procesado manual.
+- Pruebas aisladas de volumen (1002 activas, 2500 cerradas), equivalencia SLA y worker.
+- Rediseño común de acceso, administración y portal: navegación agrupada con
+  búsqueda, iconos, formularios plegables, foco visible y adaptación móvil.
+- Directorios paginados de usuarios y organizaciones; conservación de las acciones
+  de acceso y contraseñas dentro de un menú de seguridad.
+- Centro de conocimiento con borradores asistidos por IA, revisión editorial,
+  audiencias, archivo y protección contra ediciones concurrentes.
+- Portal con ayudas al alta, sugerencias de guías, siguiente paso por solicitud,
+  historial separado y valoración del servicio.
+- Pruebas HTTP aisladas de permisos, publicación, feedback, contraseñas y streaming.
+- Corrección del control IA vacío y límites de paginación.
+
 - Despliegue Docker autocontenido con extensiones PHP completas, configuracion de
   produccion, Nginx inmutable, volumen de adjuntos, healthchecks y worker persistente.
 - Configuracion compatible con variables reales del proceso y con `.env`, sin copiar
@@ -18,6 +39,11 @@
   envio de enlaces de acceso y revocacion al cambiar roles, estado o contrasena.
 - Edicion de contrasenas con formulario visible, validacion comun y errores controlados;
   una migracion pendiente se informa en pantalla en lugar de provocar un error fatal.
+- Centro de control IA con fiabilidad, latencia, tokens, errores frecuentes, contexto de
+  incidencia, adopcion de borradores y feedback humano por periodo y proveedor.
+- Feedback util/no util en el copiloto y trazabilidad de borradores usados y enviados,
+  sin bloquear el trabajo si falla la telemetria.
+- Retencion configurable de actividad IA con limpieza automatica por lotes desde el worker.
 - Nuevo espacio profesional de soporte con navegacion lateral, cabecera adaptable y una jerarquia comun para bandeja y detalle.
 - Bandeja simplificada sin accesos duplicados: las colas y el alta de incidencias viven en el menu lateral, mientras el resumen y la analitica permanecen visibles sobre los filtros.
 - Colas inteligentes para incidencias que requieren respuesta, SLA en riesgo, espera del cliente y tickets sin asignar.

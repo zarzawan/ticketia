@@ -132,17 +132,21 @@ function ui_render_kanban_card(array $incidencia, array $asignables = [], bool $
                     <a class='kanban-open' href='ver_incidencia.php?id={$id}' draggable='false'>Abrir ›</a>
                 </span>
             </div>
+            <div class='kanban-assignment'>
+                <label for='tecnico-{$id}'>Tecnico</label>
+                <form class='kanban-asignado-form' data-id='{$id}'>
+                    <select id='tecnico-{$id}' name='asignado' class='kanban-select-asignado' aria-label='Tecnico de incidencia {$id}' title='Se guarda al elegir'>
+                        {$opcionesAsignado}
+                    </select>
+                </form>
+                <span class='assignment-status' aria-live='polite'></span>
+            </div>
             <details class='kanban-controls-disclosure'>
-                <summary>Ajustar</summary>
+                <summary>Departamento</summary>
             <div class='kanban-controls'>
                 <form class='kanban-tipo-form' data-id='{$id}'>
                     <select name='tipo' class='kanban-select-tipo' aria-label='Departamento' title='Departamento'>
                         {$options}
-                    </select>
-                </form>
-                <form class='kanban-asignado-form' data-id='{$id}'>
-                    <select name='asignado' class='kanban-select-asignado' aria-label='Asignado' title='Asignado'>
-                        {$opcionesAsignado}
                     </select>
                 </form>
             </div>
@@ -222,44 +226,52 @@ function ui_render_timeline_item(array $event): string {
 
 function ui_admin_nav(string $activa): string {
     $tabs = [
-        'admin_inicio.php' => ['Inicio', 'Resumen y alertas', 'IN'],
-        'admin_usuarios.php' => ['Usuarios', 'Cuentas y permisos', 'US'],
-        'admin_clientes.php' => ['Empresas', 'Clientes del portal', 'EM'],
-        'admin_flujos.php' => ['Flujos', 'Cierre y archivo', 'FL'],
-        'admin_catalogo.php' => ['Catalogo', 'Contexto comercial IA', 'CA'],
-        'admin_auditoria.php' => ['Auditoria', 'Registro de actividad', 'AU'],
-        'admin_ajustes.php' => ['Ajustes', 'IA y mantenimiento', 'AJ'],
-        'ver_logs_llm.php' => ['Actividad IA', 'Consumo y errores', 'IA'],
+        'admin_inicio.php' => ['Vista general', 'Prioridades y salud del servicio', 'panel', 'Gestion'],
+        'admin_usuarios.php' => ['Personas y acceso', 'Usuarios, roles y contrasenas', 'personas', 'Gestion'],
+        'admin_clientes.php' => ['Organizaciones', 'Empresas y niveles de servicio', 'empresa', 'Gestion'],
+        'admin_flujos.php' => ['Ciclo de vida', 'Resolucion, cierre y archivo', 'flujo', 'Servicio'],
+        'admin_conocimiento.php' => ['Conocimiento', 'Articulos y autoservicio', 'libro', 'Servicio'],
+        'admin_catalogo.php' => ['Catalogo comercial', 'Productos para el asistente', 'catalogo', 'Servicio'],
+        'ver_logs_llm.php' => ['Control de IA', 'Calidad, consumo y errores', 'ia', 'Plataforma'],
+        'admin_ajustes.php' => ['Configuracion', 'IA, SLA y mantenimiento', 'ajustes', 'Plataforma'],
+        'admin_auditoria.php' => ['Auditoria', 'Registro de acciones', 'historial', 'Plataforma'],
     ];
 
     $html = "<aside class='admin-sidebar' id='adminSidebar'>";
     $html .= "<a class='admin-brand' href='admin_inicio.php'><span class='admin-brand-mark'>T</span><span><strong>TicketIA</strong><small>Administracion</small></span></a>";
+    $html .= "<label class='admin-nav-search'><span class='sr-only'>Buscar en administracion</span><input type='search' id='adminNavSearch' placeholder='Buscar una funcion...' autocomplete='off'></label>";
     $html .= "<nav class='admin-nav' aria-label='Administracion'>";
-    foreach ($tabs as $url => [$etiqueta, $descripcion, $icono]) {
+    $grupoActual = '';
+    foreach ($tabs as $url => [$etiqueta, $descripcion, $icono, $grupo]) {
+        if ($grupo !== $grupoActual) {
+            $html .= "<span class='admin-nav-group'>{$grupo}</span>";
+            $grupoActual = $grupo;
+        }
         $clase = $url === $activa ? 'admin-nav-link active' : 'admin-nav-link';
         $actual = $url === $activa ? " aria-current='page'" : '';
-        $html .= "<a class='{$clase}' href='{$url}'{$actual}><span class='admin-nav-icon'>{$icono}</span><span><strong>{$etiqueta}</strong><small>{$descripcion}</small></span></a>";
+        $html .= "<a class='{$clase}' href='{$url}'{$actual}><span class='admin-nav-icon'>" . ui_icono($icono) . "</span><span><strong>{$etiqueta}</strong><small>{$descripcion}</small></span></a>";
     }
-    $html .= "</nav><div class='admin-sidebar-foot'><a href='index.php'>&larr; Volver al panel</a><span>Centro de control</span></div>";
+    $html .= "<p id='adminNavVacio' hidden>Sin coincidencias</p></nav><div class='admin-sidebar-foot'><a href='index.php'>&larr; Espacio de soporte</a><a href='ayuda.php'>Ver centro de ayuda</a></div>";
     return $html . "</aside>";
 }
 
 /** Navegacion comun del espacio de soporte. */
 function ui_support_nav(string $activa = 'tickets'): string {
+    if (in_array($activa, ['accion', 'sla', 'espera', 'sin_asignar'], true)) $activa = 'tickets';
     $usuario = auth_usuario();
     $miId = (int)($usuario['id'] ?? 0);
     $items = [
         ['tickets', 'index.php', 'IN', 'Bandeja activa', 'Trabajo del equipo'],
-        ['accion', 'index.php?cola=accion', 'AC', 'Para responder', 'Siguiente accion del equipo'],
         ['mios', 'index.php?filtro_asignado=' . $miId, 'MI', 'Mis incidencias', 'Cola personal'],
-        ['sin_asignar', 'index.php?filtro_asignado=sin_asignar', 'SA', 'Sin asignar', 'Pendientes de responsable'],
         ['archivo', 'archivo.php', 'HI', 'Historial', 'Cerradas y archivadas'],
         ['analisis', 'analisis.php', 'IA', 'Inteligencia', 'Analisis del backlog'],
+        ['ayuda', 'ayuda.php', 'CO', 'Conocimiento', 'Soluciones reutilizables'],
     ];
     $html = "<aside class='support-sidebar' id='supportSidebar'>";
     $html .= "<a class='support-brand' href='index.php'><span class='support-brand-mark'>T</span><span><strong>TicketIA</strong><small>AI Service Desk</small></span></a>";
     $html .= "<nav class='support-nav' aria-label='Espacio de soporte'>";
     foreach ($items as [$clave, $url, $icono, $titulo, $detalle]) {
+        $icono = ui_icono(match ($clave) { 'analisis'=>'ia', 'ayuda'=>'libro', 'archivo'=>'historial', 'mios','sin_asignar'=>'personas', 'accion'=>'flujo', default=>'panel' });
         $clase = $clave === $activa ? 'support-nav-link active' : 'support-nav-link';
         $actual = $clave === $activa ? " aria-current='page'" : '';
         $html .= "<a class='{$clase}' href='{$url}'{$actual}><span class='support-nav-icon'>{$icono}</span><span><strong>{$titulo}</strong><small>{$detalle}</small></span></a>";
@@ -281,10 +293,10 @@ function ui_admin_cabecera(string $titulo, string $subtitulo, string $activa): v
     echo "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
     echo "    <title>TicketIA — {$t}</title>\n";
     echo "    <script>document.documentElement.setAttribute(\"data-theme\", localStorage.getItem(\"incidencias_theme\") || \"light\");</script>\n";
-    echo "    <link rel=\"stylesheet\" href=\"estilos.css\">\n";
+    echo "    <link rel=\"stylesheet\" href=\"estilos.css?v=" . filemtime(__DIR__ . '/../public/estilos.css') . "\">\n";
     echo "</head>\n<body class=\"admin-body\">\n<div class=\"admin-shell\">\n";
     echo ui_admin_nav($activa);
-    echo "<main class=\"admin-main\">\n";
+    echo "<a class=\"skip-link\" href=\"#contenidoPrincipal\">Saltar al contenido</a><main class=\"admin-main\" id=\"contenidoPrincipal\">\n";
     echo "<header class=\"admin-topbar\">\n<button id=\"adminMenuToggle\" class=\"admin-menu-toggle\" type=\"button\" aria-label=\"Abrir menu\" aria-expanded=\"false\">Menu</button><div class=\"admin-heading\">\n<span class=\"admin-eyebrow\">Centro de control</span><h1>{$t}</h1>\n<p class=\"subtitulo\">{$s}</p>\n</div>\n";
     echo "<div class=\"usuario-zona\">" . ui_menu_usuario() . "<button id=\"themeToggle\" class=\"theme-button\" type=\"button\" aria-label=\"Cambiar tema\" title=\"Cambiar tema\">Tema</button></div>\n";
     echo "</header>\n<div class=\"admin-content\">\n";
@@ -296,6 +308,7 @@ function ui_admin_pie(): void {
 </div>
 </main>
 </div>
+<script src="experiencia.js" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('themeToggle');
@@ -329,4 +342,47 @@ document.addEventListener('DOMContentLoaded', () => {
 </body>
 </html>
 HTML;
+}
+
+/** Iconos propios, sin dependencias ni fuentes externas. */
+function ui_icono(string $nombre): string {
+    $trazos = [
+        'panel' => '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+        'personas' => '<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m3 10v-3a6 6 0 0 0-2-4"/>',
+        'empresa' => '<path d="M4 21V3h12v18M16 10h4v11M2 21h20M8 7h4M8 11h4M8 15h4M9 21v-3h2v3"/>',
+        'flujo' => '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h4v4M6 14v4h4"/>',
+        'libro' => '<path d="M12 5v16M12 5C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z"/>',
+        'catalogo' => '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10v10M3 7l9 5 9-5M8 4l9 5"/>',
+        'ia' => '<path d="m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6ZM20 2v4m-2-2h4"/>',
+        'ajustes' => '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
+        'historial' => '<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-5v6l4 2"/>',
+    ];
+    return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($trazos[$nombre] ?? $trazos['panel']) . '</svg>';
+}
+
+function ui_paginacion(int $pagina, int $total, int $porPagina, array $filtros = []): string {
+    $paginas = max(1, (int)ceil($total / $porPagina));
+    $html = '<nav class="pagination" aria-label="Paginacion"><span>' . $total . ' resultados &middot; Pagina ' . $pagina . ' de ' . $paginas . '</span>';
+    foreach ([-1 => 'Anterior', 1 => 'Siguiente'] as $salto => $etiqueta) {
+        if ($pagina + $salto < 1 || $pagina + $salto > $paginas) continue;
+        $url = '?' . http_build_query(array_merge($filtros, ['pagina' => $pagina + $salto]));
+        $html .= '<a class="card-button secondary-button" href="' . ui_e($url) . '">' . $etiqueta . '</a>';
+    }
+    return $html . '</nav>';
+}
+
+function ui_worker_estado(array $salud): string {
+    return '<div class="worker-status"><strong><span class="health-dot ' . ui_e($salud['tono']) . '"></span> '
+        . ui_e($salud['etiqueta']) . '</strong><p>' . ui_e($salud['detalle'])
+        . '</p><small>Una cola vacia no confirma que el procesador este funcionando.</small></div>';
+}
+
+function ui_portal_cabecera(string $titulo, string $activa = 'solicitudes'): void {
+    $inicio = auth_es('cliente') ? 'portal.php' : 'index.php';
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TicketIA - ' . ui_e($titulo) . '</title><link rel="stylesheet" href="estilos.css?v=' . filemtime(__DIR__ . '/../public/estilos.css') . '"><script src="experiencia.js" defer></script></head><body class="portal-body portal-pro">';
+    echo '<a class="skip-link" href="#contenidoPrincipal">Saltar al contenido</a><header class="help-topbar"><a class="help-brand" href="' . $inicio . '"><span class="admin-brand-mark">T</span><strong>TicketIA<span>Centro de ayuda</span></strong></a><nav aria-label="Centro de ayuda"><a href="' . $inicio . '"' . ($activa === 'solicitudes' ? ' aria-current="page"' : '') . '>' . (auth_es('cliente') ? 'Mis solicitudes' : 'Espacio de soporte') . '</a><a href="ayuda.php"' . ($activa === 'ayuda' ? ' aria-current="page"' : '') . '>Guias y soluciones</a></nav><div class="usuario-zona">' . ui_menu_usuario() . '<button type="button" class="theme-button" data-cambiar-tema aria-label="Cambiar tema">Tema</button></div></header><main class="help-main" id="contenidoPrincipal">';
+}
+
+function ui_portal_pie(): void {
+    echo '</main><footer class="help-footer"><span>TicketIA &middot; Tu espacio de soporte</span><a href="mi_cuenta.php">Mi cuenta y seguridad</a></footer></body></html>';
 }

@@ -251,25 +251,45 @@ class LLMHttpClient {
         if (!$pdo instanceof PDO) {
             return;
         }
+        $usuario = function_exists('auth_usuario') ? auth_usuario() : null;
+        $usuarioId = isset($usuario['id']) ? (int)$usuario['id'] : null;
+        $incidenciaId = function_exists('gobierno_ia_contexto_incidencia')
+            ? gobierno_ia_contexto_incidencia()
+            : null;
+        $valoresBase = [
+            $this->provider['id'] ?? 'desconocido',
+            $this->modoNombre,
+            $this->modo['model'],
+            basename((string)($_SERVER['SCRIPT_NAME'] ?? 'cli')),
+        ];
+        $valoresResultado = [
+            (int)round((microtime(true) - $inicio) * 1000),
+            $httpCode,
+            $exito ? 1 : 0,
+            $tokensIn,
+            $tokensOut,
+            $error !== null ? mb_substr($error, 0, 255) : null,
+        ];
         try {
             $stmt = $pdo->prepare(
-                "INSERT INTO llm_logs (proveedor, modo, modelo, origen, duracion_ms, http_code, exito, tokens_entrada, tokens_salida, error)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO llm_logs
+                    (proveedor, modo, modelo, origen, usuario_id, incidencia_id, duracion_ms, http_code, exito, tokens_entrada, tokens_salida, error)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
-            $stmt->execute([
-                $this->provider['id'] ?? 'desconocido',
-                $this->modoNombre,
-                $this->modo['model'],
-                basename((string)($_SERVER['SCRIPT_NAME'] ?? 'cli')),
-                (int)round((microtime(true) - $inicio) * 1000),
-                $httpCode,
-                $exito ? 1 : 0,
-                $tokensIn,
-                $tokensOut,
-                $error !== null ? mb_substr($error, 0, 255) : null
-            ]);
+            $stmt->execute([...$valoresBase, $usuarioId, $incidenciaId, ...$valoresResultado]);
         } catch (PDOException $e) {
-            // sin tabla llm_logs o BD caida: no interferir con la llamada
+            // Compatibilidad durante un despliegue escalonado: registrar con
+            // el esquema anterior hasta que se aplique la migracion.
+            try {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO llm_logs
+                        (proveedor, modo, modelo, origen, duracion_ms, http_code, exito, tokens_entrada, tokens_salida, error)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->execute([...$valoresBase, ...$valoresResultado]);
+            } catch (PDOException $ignorado) {
+                // La observabilidad nunca debe romper la llamada principal.
+            }
         }
     }
 

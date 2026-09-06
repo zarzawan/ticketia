@@ -6,6 +6,7 @@ if ($id === false || $id === null) {
     header('Location: index.php');
     exit;
 }
+gobierno_ia_contexto_establecer((int)$id);
 
 $sql_incidencia = "SELECT incidencias.*,
     (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre,
@@ -49,9 +50,18 @@ $es_activa = in_array((string)$incidencia['estado'], dominio_estados_activos(), 
 $prioridad_info = dominio_prioridad_operativa_desglose($incidencia + ['ultimo_autor' => $ultimo_autor_publico]);
 $prioridad_operativa = $prioridad_info['total'];
 
-$stmt_copiloto = $pdo->prepare('SELECT resumen, riesgo, sentimiento, siguiente_accion, respuesta_sugerida, confianza, actualizado_en FROM copiloto_ia WHERE id_incidencia = :id');
+$stmt_copiloto = $pdo->prepare('SELECT contenido_hash, resumen, riesgo, sentimiento, siguiente_accion, respuesta_sugerida, confianza, actualizado_en FROM copiloto_ia WHERE id_incidencia = :id');
 $stmt_copiloto->execute([':id' => $id]);
 $copiloto = $stmt_copiloto->fetch(PDO::FETCH_ASSOC) ?: null;
+$feedback_copiloto = null;
+if ($copiloto && gobierno_ia_esquema_disponible($pdo)) {
+    $feedback_copiloto = gobierno_ia_feedback_usuario(
+        $pdo,
+        (int)(auth_usuario()['id'] ?? 0),
+        (int)$id,
+        (string)$copiloto['contenido_hash']
+    );
+}
 
 $adjuntos = adjuntos_de($pdo, (int)$id);
 
@@ -220,15 +230,15 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TicketIA — Incidencia #<?= $id_incidencia ?></title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
-<body class="support-body detail-workspace-body">
+<body class="support-body detail-workspace-body support-simple-detail">
 <div class="support-shell">
     <?= ui_support_nav('tickets') ?>
     <main class="support-main">
     <header class="support-topbar detail-topbar">
         <button id="supportMenuToggle" class="support-menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">Menu</button>
-        <div><span class="support-eyebrow">Incidencia #<?= $id_incidencia ?></span><h1>Espacio de resolucion</h1><p class="subtitulo">Contexto, conversacion y acciones en una sola superficie.</p></div>
+        <div><span class="support-eyebrow">Incidencia #<?= $id_incidencia ?></span><strong class="detail-topbar-title">Atender incidencia</strong></div>
         <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="theme-button" type="button">Tema</button></div>
     </header>
 <div class="container support-content">
@@ -244,25 +254,15 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     <span>· <?= (int)$dias_abierta ?> dias</span>
                 </p>
             </div>
-            <details class="ticket-header-score priority-explanation">
-                <summary><span>Prioridad operativa</span><strong><?= $prioridad_operativa ?></strong><small>Ver calculo</small></summary>
-                <div>
-                    <?php foreach ($prioridad_info['factores'] as $factor): ?>
-                        <span><?= ui_e($factor['label']) ?><b>+<?= (int)$factor['puntos'] ?></b></span>
-                    <?php endforeach; ?>
-                    <small>La puntuacion se limita a 100 y sirve para ordenar el trabajo; no cambia la urgencia declarada.</small>
-                </div>
-            </details>
+
         </header>
 
-        <div class="page-tools">
-            <a href="index.php" class="card-button secondary-button" title="Volver al panel principal">‹ Volver</a>
-            <a href="consultar_llm.php?id=<?= $id_incidencia ?>" class="card-button" title="Resumir incidencia con IA">Resumir con IA</a>
-            <button type="button" class="card-button secondary-button" id="copyTicketId">Copiar ID</button>
-        </div>
+        <a href="index.php" class="support-back-link">&larr; Volver a la bandeja</a>
+        <?php if (($_GET['comentario'] ?? '') === 'ok'): ?><div class="success-message" role="status">Comentario guardado en la conversacion.</div><?php endif; ?>
+        <?php if (isset($_GET['error'])): ?><div class="login-error" role="alert">No se pudo guardar. Escribe un comentario de hasta 30.000 caracteres.</div><?php endif; ?>
 
         <?php if (($_GET['resolucion'] ?? '') === 'ok'): ?>
-            <div class="success-message">Solucion propuesta al cliente. El ticket salio de la cola activa.</div>
+            <div class="success-message">Solucion guardada en la conversacion y propuesta al cliente. Pendiente de confirmacion.</div>
         <?php elseif (($_GET['resolucion'] ?? '') === 'error'): ?>
             <div class="login-error">No se pudo proponer la solucion. Revisa el codigo, las notas y el estado actual.</div>
         <?php endif; ?>
@@ -282,17 +282,47 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                     </section>
                 <?php endif; ?>
 
-                <section class="copilot-card" id="copilotCard">
+
+                <section class="incidencia-box compact-box conversation-panel" id="conversacion">
+                    <h2>Conversacion</h2>
+                <?php if (!empty($traduccion['mensajes'])): ?>
+                    <div class="mensajes-grid">
+                        <?php foreach ($traduccion['mensajes'] as $indice_mensaje => $mensaje): ?>
+                            <?php
+                            $is_cliente = strtolower((string)($mensaje['autor'] ?? '')) === 'cliente';
+                            $es_interno_msg = !empty($mensaje['interno']);
+                            $quien_msg = (string)($mensaje['usuario_nombre'] ?? ($is_cliente ? 'Cliente' : 'Tecnico'));
+                            ?>
+                            <?php if ($indice_mensaje === array_key_last($traduccion['mensajes'])): ?><span id="ultimoMensaje"></span><?php endif; ?>
+                            <div class="mensaje-card <?= $es_interno_msg ? 'interna' : ($is_cliente ? 'cliente' : 'tecnico') ?>" id="mensaje-<?= (int)($mensaje['id'] ?? 0) ?>">
+                                <div class="mensaje-header">
+                                    <span class="mensaje-autor"><?= ui_e($quien_msg) ?><?= $es_interno_msg ? ' <span class="badge-interna">Nota interna</span>' : '' ?></span>
+                                    <span class="mensaje-fecha"><?= ui_e((string)($mensaje['fecha'] ?? '')) ?></span>
+                                </div>
+                                <?= ui_render_markdown_block((string)($mensaje['mensaje'] ?? ''), 'recomendacion-text') ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="help-line">Todavia no hay mensajes en esta incidencia.</p>
+                <?php endif; ?>
+
+                <?php if ($es_activa): ?>
+                <details class="copilot-card assistant-disclosure" id="copilotCard" data-contenido-hash="<?= ui_e((string)($copiloto['contenido_hash'] ?? '')) ?>">
+                    <summary>Propuesta de IA <small>Revisa el borrador antes de enviarlo</small></summary>
+                    <div class="assistant-content">
                     <header>
-                        <div><span class="copilot-kicker">Copiloto IA</span><h2>Brief de resolucion</h2><p>Resume el contexto, detecta riesgo y propone el siguiente movimiento.</p></div>
+                        <div><h3>Ayuda para responder</h3></div>
                         <div class="copilot-actions">
-                            <?php if (($incidencia['idioma'] ?? 'es') !== 'es'): ?>
-                                <a href="ver_incidencia.php?id=<?= $id_incidencia ?>&traducir=es" class="card-button secondary-button" title="Traducir titulo, descripcion y conversacion al espanol"><?= $mostrar_traduccion ? 'Traducido al espanol' : 'Traducir al espanol' ?></a>
-                            <?php endif; ?>
+
                             <span id="copilotEstado" class="copilot-status"><?= $copiloto ? 'Actualizado ' . ui_e(date('d/m H:i', strtotime((string)$copiloto['actualizado_en']))) : 'Sin generar' ?></span>
-                            <button type="button" class="card-button" id="generarCopiloto" data-id="<?= $id_incidencia ?>"><?= $copiloto ? 'Actualizar brief' : 'Generar brief' ?></button>
                         </div>
                     </header>
+                    <div class="copilot-draft" id="copilotDraft" <?= empty($copiloto['respuesta_sugerida']) ? 'hidden' : '' ?>>
+                        <span>Borrador sugerido</span><p id="copilotRespuesta"><?= ui_e($copiloto['respuesta_sugerida'] ?? '') ?></p>
+                        <?php if ($es_activa): ?><button type="button" class="card-button secondary-button" id="usarBorrador">Usar en respuesta</button><?php endif; ?>
+                    </div>
+                    <details class="assistant-context"><summary>Contexto, confianza y valoracion</summary>
                     <div class="copilot-grid <?= $copiloto ? '' : 'is-empty' ?>" id="copilotGrid">
                         <div class="copilot-main"><span>Resumen ejecutivo</span><p id="copilotResumen"><?= $copiloto ? ui_e($copiloto['resumen']) : 'Genera el brief para convertir toda la conversacion en un contexto operativo compacto.' ?></p></div>
                         <div class="copilot-signal"><span>Riesgo</span><strong id="copilotRiesgo" class="risk-<?= ui_e($copiloto['riesgo'] ?? 'sin-datos') ?>"><?= ui_e(ucfirst($copiloto['riesgo'] ?? 'Sin datos')) ?></strong></div>
@@ -300,11 +330,16 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         <div class="copilot-next"><span>Siguiente mejor accion</span><p id="copilotAccion"><?= $copiloto ? ui_e($copiloto['siguiente_accion']) : 'Pendiente de analisis.' ?></p></div>
                         <div class="copilot-confidence"><span>Confianza</span><strong id="copilotConfianza"><?= (int)($copiloto['confianza'] ?? 0) ?>%</strong></div>
                     </div>
-                    <div class="copilot-draft" id="copilotDraft" <?= empty($copiloto['respuesta_sugerida']) ? 'hidden' : '' ?>>
-                        <span>Borrador sugerido</span><p id="copilotRespuesta"><?= ui_e($copiloto['respuesta_sugerida'] ?? '') ?></p>
-                        <?php if ($es_activa): ?><button type="button" class="card-button secondary-button" id="usarBorrador">Usar en respuesta</button><?php endif; ?>
+                    <div class="copilot-feedback" id="copilotFeedback" <?= $copiloto ? '' : 'hidden' ?>>
+                        <span>Este brief te ha ayudado?</span>
+                        <div>
+                            <button type="button" class="copilot-feedback-button <?= (int)($feedback_copiloto['valoracion'] ?? 0) === 1 ? 'is-active' : '' ?>" data-valoracion="1">Si, es util</button>
+                            <button type="button" class="copilot-feedback-button <?= (int)($feedback_copiloto['valoracion'] ?? 0) === -1 ? 'is-active' : '' ?>" data-valoracion="-1">No ayuda</button>
+                        </div>
+                        <small id="copilotFeedbackEstado" aria-live="polite"><?= $feedback_copiloto ? 'Feedback guardado' : 'Tu valoracion mejora el control de calidad.' ?></small>
                     </div>
 
+                    </details>
                     <?php if (($incidencia['tipo'] ?? '') === 'Comercial'): ?>
                         <section class="copilot-commercial">
                             <header>
@@ -329,49 +364,37 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                             <?php endif; ?>
                         </section>
                     <?php endif; ?>
-                </section>
-
-                <div class="incidencia-box compact-box">
-                    <h2>Mensajes y respuesta</h2>
-                <?php if (!empty($traduccion['mensajes'])): ?>
-                    <div class="mensajes-grid">
-                        <?php foreach ($traduccion['mensajes'] as $mensaje): ?>
-                            <?php
-                            $is_cliente = strtolower((string)($mensaje['autor'] ?? '')) === 'cliente';
-                            $es_interno_msg = !empty($mensaje['interno']);
-                            $quien_msg = (string)($mensaje['usuario_nombre'] ?? ($is_cliente ? 'Cliente' : 'Tecnico'));
-                            ?>
-                            <div class="mensaje-card <?= $es_interno_msg ? 'interna' : ($is_cliente ? 'cliente' : 'tecnico') ?>" id="mensaje-<?= (int)($mensaje['id'] ?? 0) ?>">
-                                <div class="mensaje-header">
-                                    <span class="mensaje-autor"><?= ui_e($quien_msg) ?><?= $es_interno_msg ? ' <span class="badge-interna">Nota interna</span>' : '' ?></span>
-                                    <span class="mensaje-fecha"><?= ui_e((string)($mensaje['fecha'] ?? '')) ?></span>
-                                </div>
-                                <?= ui_render_markdown_block((string)($mensaje['mensaje'] ?? ''), 'recomendacion-text') ?>
-                            </div>
-                        <?php endforeach; ?>
                     </div>
-                <?php else: ?>
-                    <p class="help-line">Todavia no hay mensajes en esta incidencia.</p>
-                <?php endif; ?>
+                </details>
 
-                <?php if ($es_activa): ?>
-                    <form action="guardar_mensaje.php" method="POST" class="composer conversation-composer">
+                    <form action="guardar_mensaje.php" method="POST" class="composer conversation-composer" id="formRespuesta">
+                        <div class="composer-heading"><label for="mensaje">Tu respuesta</label><button type="button" class="card-button secondary-button" id="generarCopiloto" data-id="<?= $id_incidencia ?>">Redactar con IA</button></div>
                         <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                        <textarea name="mensaje" id="mensaje" rows="7" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
+                        <input type="hidden" name="origen_ia" id="origenIa" value="">
+                        <input type="hidden" name="contenido_hash_ia" id="contenidoHashIa" value="">
+                        <textarea name="mensaje" id="mensaje" rows="5" maxlength="30000" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"></textarea>
                         <div class="composer-row">
-                            <label class="composer-check" title="Solo visible para el equipo, nunca para el cliente. No se traduce.">
-                                <input type="checkbox" name="interno" value="1"> Nota interna
-                            </label>
-                            <span class="composer-spacer"></span>
-                            <input type="submit" value="Enviar">
+                            <label class="reply-action-label" for="accionRespuesta">Al enviar</label>
+                            <select name="accion_respuesta" id="accionRespuesta" aria-describedby="respuestaAyuda">
+                                <option value="responder">Responder al cliente</option>
+                                <option value="resolver">Proponer solucion</option>
+                                <option value="nota">Guardar nota interna</option>
+                            </select>
+                            <button type="submit" class="card-button" id="enviarRespuesta">Enviar respuesta</button>
                         </div>
+                        <p class="help-line" id="respuestaAyuda" aria-live="polite">Visible para el cliente. La incidencia seguira abierta.</p>
+                        <details class="resolution-options" id="opcionesResolucion" hidden><summary>Tipo de solucion (opcional)</summary>
+                            <label for="resolucion_codigo">Resultado</label>
+                            <select name="resolucion_codigo" id="resolucion_codigo"><?php foreach (dominio_codigos_resolucion() as $codigo => $etiqueta): ?><option value="<?= ui_e($codigo) ?>"><?= ui_e($etiqueta) ?></option><?php endforeach; ?></select>
+                        </details>
                     </form>
                 <?php else: ?>
                     <p class="help-line">El trabajo esta finalizado. Reabre la incidencia para anadir una respuesta.</p>
                 <?php endif; ?>
-                </div>
-                <div class="incidencia-box compact-box" id="adjuntos">
-                    <h2>Adjuntos</h2>
+                </section>
+                <details class="incidencia-box compact-box secondary-disclosure" id="adjuntos" <?= isset($_GET['adjunto']) || isset($_GET['adjunto_error']) ? 'open' : '' ?>>
+                    <summary>Archivos adjuntos <small><?= count($adjuntos) ?> archivos</small></summary>
+                    <div class="disclosure-content">
                     <?php if (isset($_GET['adjunto'])): ?>
                         <div class="success-message">Adjunto subido correctamente.</div>
                     <?php elseif (isset($_GET['adjunto_error'])): ?>
@@ -398,12 +421,42 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         </form>
                         <p class="help-line">Maximo <?= ui_e(adjuntos_formato_tamano(adjuntos_max_bytes())) ?> por fichero.</p>
                     <?php endif; ?>
-                </div>
+                    </div>
+                </details>
             </div>
 
             <aside class="detail-side">
                 <div class="incidencia-box compact-box">
-                    <h2>Detalles</h2>
+                    <h2>Seguimiento</h2>
+                    <span class="turn-badge <?= ui_e($siguiente_paso['clave']) ?>"><?= ui_e($siguiente_paso['label']) ?></span>
+                                            <div class="detail-row">
+                            <span>Asignado</span>
+                            <form action="asignar_incidencia.php" method="POST" class="detail-row-form">
+                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
+                                <select name="asignado" onchange="this.form.submit()" title="Se guarda automaticamente">
+                                    <option value="" <?= empty($incidencia['asignado_id']) ? 'selected' : '' ?>>Sin asignar</option>
+                                    <?php foreach ($asignables as $asignable): ?>
+                                        <option value="<?= (int)$asignable['id'] ?>" <?= (int)($incidencia['asignado_id'] ?? 0) === (int)$asignable['id'] ? 'selected' : '' ?>>
+                                            <?= ui_e($asignable['nombre']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
+                        </div>
+                    <p class="support-sla-summary">SLA <strong><?= ui_e(dominio_duracion_humana((int)$sla['restante_segundos'])) ?></strong></p>
+                    <details class="secondary-disclosure"><summary>Mas datos de la incidencia</summary><div class="disclosure-content">
+                            <?php if (($incidencia['idioma'] ?? 'es') !== 'es'): ?>
+                                <a href="ver_incidencia.php?id=<?= $id_incidencia ?>&traducir=es" class="card-button secondary-button" title="Traducir titulo, descripcion y conversacion al espanol"><?= $mostrar_traduccion ? 'Traducido al espanol' : 'Traducir al espanol' ?></a>
+                            <?php endif; ?>
+                                <details class="ticket-header-score priority-explanation">
+                <summary><span>Prioridad operativa</span><strong><?= $prioridad_operativa ?></strong><small>Ver calculo</small></summary>
+                <div>
+                    <?php foreach ($prioridad_info['factores'] as $factor): ?>
+                        <span><?= ui_e($factor['label']) ?><b>+<?= (int)$factor['puntos'] ?></b></span>
+                    <?php endforeach; ?>
+                    <small>La puntuacion se limita a 100 y sirve para ordenar el trabajo; no cambia la urgencia declarada.</small>
+                </div>
+            </details>
                     <div class="detail-sla <?= ui_e((string)$sla['estado']) ?>">
                         <div class="detail-sla-heading">
                             <span>SLA · <?= ui_e(dominio_niveles_servicio()[$incidencia['nivel_servicio']] ?? 'Estandar') ?><?= $sla['tipo_politica'] !== '*' ? ' · ' . ui_e((string)$sla['tipo_politica']) : '' ?></span>
@@ -469,55 +522,31 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                                 </select>
                             </form>
                         </div>
-                        <div class="detail-row">
-                            <span>Asignado</span>
-                            <form action="asignar_incidencia.php" method="POST" class="detail-row-form">
-                                <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                                <select name="asignado" onchange="this.form.submit()" title="Se guarda automaticamente">
-                                    <option value="" <?= empty($incidencia['asignado_id']) ? 'selected' : '' ?>>Sin asignar</option>
-                                    <?php foreach ($asignables as $asignable): ?>
-                                        <option value="<?= (int)$asignable['id'] ?>" <?= (int)($incidencia['asignado_id'] ?? 0) === (int)$asignable['id'] ? 'selected' : '' ?>>
-                                            <?= ui_e($asignable['nombre']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </form>
-                        </div>
+
                     </div>
 
-                    <?php if ($es_activa): ?>
-                        <form action="cerrar_incidencia.php" method="POST" class="detail-action form-stack resolution-form">
-                            <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
-                            <h3>Proponer solucion</h3>
-                            <p class="help-line">Saca el ticket de la cola activa y pide confirmacion al cliente.</p>
-                            <label class="filter-label" for="resolucion_codigo">Resultado</label>
-                            <select name="resolucion_codigo" id="resolucion_codigo" required>
-                                <?php foreach (dominio_codigos_resolucion() as $codigo => $etiqueta): ?>
-                                    <option value="<?= ui_e($codigo) ?>"><?= ui_e($etiqueta) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <label class="filter-label" for="resolucion_notas">Que se hizo</label>
-                            <textarea name="resolucion_notas" id="resolucion_notas" rows="4" required placeholder="Explica la solucion de forma util para el cliente y futuras incidencias."></textarea>
-                            <button type="submit" class="card-button">Proponer solucion</button>
-                        </form>
-                    <?php else: ?>
+                    </div></details>
+                    <?php if (!$es_activa): ?>
+                    <details class="reopen-disclosure"><summary>Reabrir incidencia</summary>
+
                         <form action="reabrir_incidencia.php" method="POST" class="detail-action form-stack">
                             <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                             <label class="filter-label" for="motivo">Motivo de la reapertura</label>
                             <textarea name="motivo" id="motivo" rows="3" required></textarea>
                             <input type="submit" value="Reabrir incidencia">
                         </form>
+                    </details>
                     <?php endif; ?>
                 </div>
 
-                <div class="incidencia-box compact-box">
-                    <h2>Actividad</h2>
+                <details class="incidencia-box compact-box secondary-disclosure">
+                    <summary>Historial de actividad</summary>
                     <div class="timeline">
                         <?php foreach ($timeline as $event): ?>
                             <?= ui_render_timeline_item($event) ?>
                         <?php endforeach; ?>
                     </div>
-                </div>
+                </details>
             </aside>
         </div>
     </div>
@@ -585,6 +614,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const generarCopiloto = document.getElementById('generarCopiloto');
     const usarBorrador = document.getElementById('usarBorrador');
     const copilotRespuesta = document.getElementById('copilotRespuesta');
+    const copilotCard = document.getElementById('copilotCard');
+    const copilotFeedback = document.getElementById('copilotFeedback');
+    const feedbackEstado = document.getElementById('copilotFeedbackEstado');
+    const origenIa = document.getElementById('origenIa');
+    const contenidoHashIa = document.getElementById('contenidoHashIa');
+    const registrarFeedback = async (accion, valoracion = null) => {
+        const hash = copilotCard?.dataset.contenidoHash || '';
+        if (!hash) return false;
+        const body = new URLSearchParams({
+            id_incidencia: <?= json_encode($id_incidencia) ?>,
+            contenido_hash: hash,
+            accion,
+            csrf: <?= json_encode(csrf_token()) ?>
+        });
+        if (valoracion !== null) body.set('valoracion', String(valoracion));
+        try {
+            const response = await fetch('feedback_ia.php', { method: 'POST', body });
+            const data = await response.json();
+            return response.ok && data.ok;
+        } catch (error) {
+            return false;
+        }
+    };
     const pintarCopiloto = (insight) => {
         document.getElementById('copilotResumen').textContent = insight.resumen || '';
         const riesgo = document.getElementById('copilotRiesgo');
@@ -597,12 +649,20 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('copilotDraft').hidden = !insight.respuesta_sugerida;
         document.getElementById('copilotGrid').classList.remove('is-empty');
         document.getElementById('copilotEstado').textContent = 'Brief actualizado ahora';
-        generarCopiloto.textContent = 'Actualizar brief';
+        generarCopiloto.textContent = 'Redactar con IA';
+        copilotCard.open = true;
+        copilotCard.dataset.contenidoHash = insight.contenido_hash || '';
+        copilotFeedback.hidden = false;
+        document.querySelectorAll('.copilot-feedback-button').forEach((boton) => boton.classList.remove('is-active'));
+        feedbackEstado.textContent = 'Tu valoracion mejora el control de calidad.';
+        if (origenIa) origenIa.value = '';
+        if (contenidoHashIa) contenidoHashIa.value = '';
     };
     if (generarCopiloto) {
         generarCopiloto.addEventListener('click', async () => {
             generarCopiloto.disabled = true;
-            document.getElementById('copilotEstado').textContent = 'Analizando conversacion...';
+            copilotCard.open = true;
+            document.getElementById('copilotEstado').textContent = 'Preparando un borrador. Todavia no se ha enviado.';
             try {
                 const body = new URLSearchParams({
                     id_incidencia: generarCopiloto.dataset.id,
@@ -624,11 +684,46 @@ document.addEventListener('DOMContentLoaded', () => {
         usarBorrador.addEventListener('click', () => {
             const mensaje = document.getElementById('mensaje');
             if (!mensaje) return;
+            if (mensaje.value.trim() && !window.confirm('Sustituir el texto que ya has escrito por el borrador de IA?')) return;
             mensaje.value = copilotRespuesta.textContent.trim();
+            document.getElementById('respuestaAyuda').textContent = 'Borrador de IA sin enviar. Revisalo y pulsa el boton de envio para guardarlo en la conversacion.';
+            copilotCard.open = false;
+            if (origenIa) origenIa.value = 'copiloto';
+            if (contenidoHashIa) contenidoHashIa.value = copilotCard.dataset.contenidoHash || '';
+            registrarFeedback('usar_borrador');
             mensaje.focus();
             mensaje.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
     }
+    document.querySelectorAll('.copilot-feedback-button').forEach((boton) => {
+        boton.addEventListener('click', async () => {
+            const valoracion = parseInt(boton.dataset.valoracion || '0', 10);
+            feedbackEstado.textContent = 'Guardando...';
+            const ok = await registrarFeedback('valorar', valoracion);
+            if (!ok) {
+                feedbackEstado.textContent = 'No se pudo guardar. Intentalo de nuevo.';
+                return;
+            }
+            document.querySelectorAll('.copilot-feedback-button').forEach((otro) => otro.classList.toggle('is-active', otro === boton));
+            feedbackEstado.textContent = 'Gracias. Feedback guardado.';
+        });
+    });
+
+    const accionRespuesta = document.getElementById('accionRespuesta');
+    accionRespuesta?.addEventListener('change', () => {
+        const accion = accionRespuesta.value;
+        document.getElementById('enviarRespuesta').textContent = accion === 'nota' ? 'Guardar nota' : (accion === 'resolver' ? 'Enviar solucion' : 'Enviar respuesta');
+        document.getElementById('respuestaAyuda').textContent = accion === 'nota'
+            ? 'Solo visible para el equipo. No se enviara al cliente.'
+            : (accion === 'resolver' ? 'Se guardara como mensaje visible para el cliente y quedara pendiente de su confirmacion.' : 'Visible para el cliente. La incidencia seguira abierta.');
+        document.getElementById('opcionesResolucion').hidden = accion !== 'resolver';
+        document.getElementById('formRespuesta').classList.toggle('is-internal', accion === 'nota');
+    });
+    document.getElementById('formRespuesta')?.addEventListener('submit', () => {
+        const boton = document.getElementById('enviarRespuesta');
+        boton.disabled = true;
+        boton.textContent = 'Guardando...';
+    });
 
     const copyButton = document.getElementById('copyTicketId');
     if (copyButton) {
