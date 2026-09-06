@@ -15,21 +15,21 @@ $filtro_urgencia = isset($_GET['filtro_urgencia']) && in_array($_GET['filtro_urg
 $filtro_estado = isset($_GET['filtro_estado']) && in_array($_GET['filtro_estado'], $estados) ? $_GET['filtro_estado'] : '';
 
 // Obtener datos para los gráficos
-$sql_tipos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo = 'Seguridad' GROUP BY tipo";
+$sql_tipos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo = 'Seguridad' AND estado IN ('abierta','en_curso') GROUP BY tipo";
 $stmt_tipos = $pdo->query($sql_tipos);
 $datos_tipos = $stmt_tipos->fetchAll(PDO::FETCH_ASSOC);
 
-$sql_urgencias = "SELECT urgencia, COUNT(*) as total FROM incidencias WHERE tipo = 'Seguridad' GROUP BY urgencia";
+$sql_urgencias = "SELECT urgencia, COUNT(*) as total FROM incidencias WHERE tipo = 'Seguridad' AND estado IN ('abierta','en_curso') GROUP BY urgencia";
 $stmt_urgencias = $pdo->query($sql_urgencias);
 $datos_urgencias = $stmt_urgencias->fetchAll(PDO::FETCH_ASSOC);
 
-$sql_estados = "SELECT estado, COUNT(*) as total  FROM incidencias WHERE tipo = 'Seguridad' GROUP BY estado";
+$sql_estados = "SELECT estado, COUNT(*) as total FROM incidencias WHERE tipo = 'Seguridad' AND estado IN ('abierta','en_curso') GROUP BY estado";
 $stmt_estados = $pdo->query($sql_estados);
 $datos_estados = $stmt_estados->fetchAll(PDO::FETCH_ASSOC);
 
 // Función para mostrar incidencias
 function mostrarIncidencias($pdo, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado) {
-    global $tipo_iconos, $estados;
+    global $tipo_iconos;
 
     $sql = "SELECT * FROM incidencias WHERE tipo = 'Seguridad'";
     $params = [];
@@ -37,6 +37,8 @@ function mostrarIncidencias($pdo, $busqueda, $filtro_tipo, $filtro_urgencia, $fi
     if ($filtro_estado) {
         $sql .= " AND estado = :estado";
         $params[':estado'] = $filtro_estado;
+    } else {
+        $sql .= " AND estado IN ('abierta','en_curso')";
     }
 
     if ($filtro_tipo) {
@@ -59,13 +61,14 @@ function mostrarIncidencias($pdo, $busqueda, $filtro_tipo, $filtro_urgencia, $fi
         }
     }
 
-    $sql .= " ORDER BY fecha_creacion DESC";
+    $sql .= " ORDER BY fecha_creacion DESC LIMIT 60";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $incidencias = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $estados_vista = $filtro_estado !== '' ? [$filtro_estado] : dominio_estados_activos();
     $incidencias_por_estado = [];
-    foreach ($estados as $estado) {
+    foreach ($estados_vista as $estado) {
         $incidencias_por_estado[$estado] = [];
     }
     foreach ($incidencias as $incidencia) {
@@ -73,10 +76,7 @@ function mostrarIncidencias($pdo, $busqueda, $filtro_tipo, $filtro_urgencia, $fi
     }
 
     $hay_resultados = false;
-    foreach ($estados as $estado) {
-        if ($filtro_estado && $filtro_estado !== $estado) {
-            continue;
-        }
+    foreach ($estados_vista as $estado) {
 
         $estado_titulo = ucfirst(str_replace("_", " ", $estado));
         $estado_clase = str_replace("_", "-", $estado);
@@ -149,6 +149,8 @@ try {
     if ($filtro_estado) {
         $sql .= " AND estado = :estado";
         $params[':estado'] = $filtro_estado;
+    } else {
+        $sql .= " AND estado IN ('abierta','en_curso')";
     }
     if ($filtro_urgencia) {
         $sql .= " AND urgencia = :urgencia";
@@ -164,7 +166,7 @@ try {
         }
     }
 
-    $sql .= " ORDER BY FIELD(estado, 'abierta', 'en_curso', 'cerrada'), fecha_creacion ASC";
+    $sql .= " ORDER BY FIELD(estado, 'abierta', 'en_curso', 'resuelta', 'cerrada'), fecha_creacion ASC LIMIT 60";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -219,6 +221,7 @@ try {
         'total' => count($incidencias),
         'abierta' => 0,
         'en_curso' => 0,
+        'resuelta' => 0,
         'cerrada' => 0,
         'criticas' => 0,
         'sin_respuesta' => 0,
@@ -293,7 +296,7 @@ try {
     // Optimización del JSON
     // Tablas de código ultracortas
     $urgMap = ['critico' => 'c', 'urgente' => 'u', 'leve' => 'l'];
-    $estMap = ['abierta' => 'a', 'en_curso' => 'e', 'cerrada' => 'z'];
+    $estMap = ['abierta' => 'a', 'en_curso' => 'e', 'resuelta' => 'r', 'cerrada' => 'z'];
     $tipoMap = [
         'Servidores' => 1, 'Red y acceso' => 2, 'Seguridad' => 3, 'Software y apps' => 4,
         'Microsoft 365' => 5, 'APIs y scripts' => 6, 'Correo' => 7, 'Bases de datos' => 8,
@@ -324,8 +327,8 @@ try {
         $msg = [];
         if (!empty($i['mensajes'])) {
             $seen = [];
-            foreach ($i['mensajes'] as $m) {
-                $txt = $m['mensaje'];
+            foreach (array_slice($i['mensajes'], -2) as $m) {
+                $txt = mb_substr((string)$m['mensaje'], 0, 400);
                 if (!isset($seen[$txt])) {
                     $seen[$txt] = true;
                     $msg[] = [strtolower(substr($m['autor'], 0, 1)), $txt]; // Usar inicial del autor ("c" o "t")
@@ -333,7 +336,9 @@ try {
             }
         }
 
-        $reaperturas = !empty($i['reaperturas']) ? array_column($i['reaperturas'], 'motivo') : [];
+        $reaperturas = !empty($i['reaperturas'])
+            ? array_map(static fn($motivo): string => mb_substr((string)$motivo, 0, 300), array_slice(array_column($i['reaperturas'], 'motivo'), -2))
+            : [];
 
         // Calcular campos derivados
         $age = (new DateTime())->diff(new DateTime($i['fecha_creacion']))->days;
@@ -346,8 +351,8 @@ try {
             's' => $estMap[$i['estado']] ?? 'a',
             'tp' => $tipoMap[$i['tipo']] ?? 0,
             'fc' => $i['fecha_creacion'],
-            't' => $i['titulo'],
-            'd' => $i['descripcion'],
+            't' => mb_substr((string)$i['titulo'], 0, 180),
+            'd' => mb_substr((string)$i['descripcion'], 0, 600),
             'm' => $msg,
             'rp' => $reaperturas,
             'age' => $age, // Días abierta
@@ -495,29 +500,30 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TicketIA — Analisis de seguridad</title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
-<body>
-<div class="container">
+<body class="support-body">
+<div class="support-shell">
+    <?= ui_support_nav('analisis') ?>
+    <main class="support-main">
+    <header class="support-topbar">
+        <button id="supportMenuToggle" class="support-menu-toggle" type="button">Menu</button>
+        <div><span class="support-eyebrow">Inteligencia de seguridad</span><h1>Riesgos del trabajo activo</h1><p class="subtitulo">Hasta 60 incidencias de seguridad, sin cargar el historico.</p></div>
+        <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="theme-button" type="button">Tema</button></div>
+    </header>
+<div class="container support-content analysis-workspace">
     <div class="page-shell">
-        <header class="page-header">
-            <div>
-                <h1>Analisis de incidencias de seguridad</h1>
-                <p class="subtitulo">Monitor de riesgo y recomendaciones de accion generado por IA.</p>
-            </div>
-            <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
-        </header>
-
-        <div class="page-tools">
-            <a href="index.php" class="card-button secondary-button" title="Volver al panel principal">‹ Volver</a>
+        <div class="page-tools analysis-toolbar">
             <button class="card-button reload-analisis" title="Recargar analisis">Recargar</button>
             <button class="card-button secondary-button copy-resumen" title="Copiar resumen">Copiar</button>
-            <button class="card-button secondary-button auto-scroll" title="Activar/desactivar autoscroll">Autoscroll: ON</button>
-            <button class="card-button secondary-button download-resumen" title="Descargar resumen">Descargar .txt</button>
-            <button class="card-button secondary-button clear-resumen" title="Limpiar contenido">Limpiar</button>
             <button class="card-button secondary-button stop-stream" title="Detener generacion">Detener</button>
             <span class="status-pill" id="streamStatus">Generando analisis...</span>
             <span class="status-pill" id="streamMetrics">0 caracteres</span>
+            <details class="analysis-more-tools"><summary>Mas opciones</summary><div>
+                <button class="card-button secondary-button auto-scroll" type="button">Autoscroll: ON</button>
+                <button class="card-button secondary-button download-resumen" type="button">Descargar .txt</button>
+                <button class="card-button secondary-button clear-resumen" type="button">Limpiar</button>
+            </div></details>
         </div>
 
         <div class="incidencia-box compact-box">
@@ -537,6 +543,8 @@ if (isset($_GET['stream']) && $_GET['stream'] == 1) {
         </div>
     </div>
     <button class="scroll-top card-button" title="Volver arriba">Arriba</button>
+</div>
+</main>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -569,6 +577,8 @@ document.addEventListener('DOMContentLoaded', () => {
             applyTheme(current === 'dark' ? 'light' : 'dark');
         });
     }
+    const supportMenuToggle = document.getElementById('supportMenuToggle');
+    if (supportMenuToggle) supportMenuToggle.addEventListener('click', () => document.body.classList.toggle('support-menu-open'));
 
     let rawText = '';
     let autoScroll = true;
@@ -704,4 +714,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-

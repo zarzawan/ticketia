@@ -12,16 +12,23 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --no-
 # --- Etapa 2: runtime ---
 FROM php:8.2-fpm-alpine
 
-RUN docker-php-ext-install pdo_mysql
+RUN set -eux; \
+    apk add --no-cache libcurl oniguruma; \
+    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS curl-dev oniguruma-dev; \
+    docker-php-ext-install -j"$(nproc)" curl mbstring opcache pdo_mysql; \
+    apk del .build-deps; \
+    mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+COPY docker/php.ini "$PHP_INI_DIR/conf.d/ticketia.ini"
 
 WORKDIR /var/www/ticketia
 
-COPY public/ public/
-COPY src/ src/
-COPY bin/ bin/
-COPY db/ db/
-COPY phinx.php .env.example ./
-COPY --from=dependencias /app/vendor/ vendor/
+COPY --chown=www-data:www-data public/ public/
+COPY --chown=www-data:www-data src/ src/
+COPY --chown=www-data:www-data bin/ bin/
+COPY --chown=www-data:www-data db/ db/
+COPY --chown=www-data:www-data phinx.php .env.example ./
+COPY --from=dependencias --chown=www-data:www-data /app/vendor/ vendor/
 
 # Almacen de adjuntos fuera del docroot (montar volumen en produccion)
 RUN mkdir -p almacen/adjuntos && chown -R www-data:www-data almacen

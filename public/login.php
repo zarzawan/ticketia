@@ -8,7 +8,9 @@ if (auth_usuario() !== null) {
 }
 
 $error = '';
+$volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    unset($_SESSION['auth_2fa_pendiente']);
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
@@ -27,11 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $destino);
             exit;
         }
+        if (!empty($resultado['requiere_2fa'])) {
+            $_SESSION['auth_2fa_pendiente']['volver'] = $volver_param;
+            header('Location: verificar_2fa.php');
+            exit;
+        }
         $error = (string)$resultado['error'];
     }
 }
-
-$volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -40,14 +45,16 @@ $volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TicketIA — Iniciar sesion</title>
     <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("incidencias_theme") || "light");</script>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
-<body class="login-body">
+<body class="login-body login-pro">
 <div class="login-shell">
+    <section class="login-story"><a class="login-wordmark" href="login.php"><span class="admin-brand-mark">T</span> TicketIA</a><div><span class="section-label">Soporte mas humano. Impulsado por IA.</span><h2>Menos friccion.<br>Mas soluciones.</h2><p>Personas, conversaciones y conocimiento, en un mismo lugar.</p><div class="login-steps"><span><?= ui_icono('personas') ?> Conecta con tu equipo</span><span><?= ui_icono('ia') ?> Resuelve con ayuda de IA</span><span><?= ui_icono('libro') ?> Comparte lo que funciona</span></div></div><small>Tu espacio de soporte, siempre a mano.</small></section>
     <div class="login-card">
         <div class="login-marca">
-            <h1>TicketIA</h1>
-            <p class="subtitulo">Helpdesk con inteligencia artificial</p>
+            <span class="section-label">Bienvenido a TicketIA</span>
+            <h1>Vamos a resolverlo.</h1>
+            <p class="subtitulo">Accede a tu espacio de trabajo o a tus solicitudes.</p>
         </div>
 
         <?php if ($error !== ''): ?>
@@ -69,7 +76,7 @@ $volver_param = (string)($_GET['volver'] ?? ($_POST['volver'] ?? ''));
             <input type="submit" value="Entrar" class="login-boton">
         </form>
 
-        <p class="help-line login-pie">Si has olvidado tu contrasena, contacta con un administrador.</p>
+        <p class="help-line login-pie"><a href="solicitar_recuperacion.php">He olvidado mi contrasena</a></p>
     </div>
 </div>
 </body>

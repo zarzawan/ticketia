@@ -26,7 +26,7 @@ function adjuntos_directorio(): string {
 }
 
 function adjuntos_max_bytes(): int {
-    return max(1, (int)($_ENV['ADJUNTOS_MAX_MB'] ?? 10)) * 1024 * 1024;
+    return max(1, (int)entorno_valor('ADJUNTOS_MAX_MB', 10)) * 1024 * 1024;
 }
 
 function adjuntos_formato_tamano(int $bytes): string {

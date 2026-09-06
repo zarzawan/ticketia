@@ -11,6 +11,7 @@ if (!$id_incidencia) {
     header('Location: index.php');
     exit;
 }
+gobierno_ia_contexto_establecer((int)$id_incidencia);
 
 $sql = "SELECT titulo, descripcion FROM incidencias WHERE id = :id";
 $stmt = $pdo->prepare($sql);
@@ -22,7 +23,7 @@ if (!$incidencia) {
     exit;
 }
 
-$sql_productos = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo FROM catalogo_productos";
+$sql_productos = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo FROM catalogo_productos WHERE activo = 1";
 $stmt_productos = $pdo->query($sql_productos);
 $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
 $catalogo = json_encode($productos);

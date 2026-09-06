@@ -12,9 +12,10 @@ if (!$id_incidencia) {
     exit;
 }
 
-$stmt = $pdo->prepare("SELECT id FROM incidencias WHERE id = :id");
+$stmt = $pdo->prepare("SELECT estado FROM incidencias WHERE id = :id");
 $stmt->execute([':id' => $id_incidencia]);
-if (!$stmt->fetchColumn()) {
+$estado = $stmt->fetchColumn();
+if ($estado === false) {
     header('Location: index.php');
     exit;
 }
@@ -26,6 +27,10 @@ if ($es_cliente && !incidencia_visible_para_cliente($pdo, (int)$id_incidencia, a
     exit;
 }
 $pagina_detalle = $es_cliente ? 'portal_ver.php' : 'ver_incidencia.php';
+if (!in_array((string)$estado, dominio_estados_activos(), true)) {
+    header("Location: $pagina_detalle?id=$id_incidencia");
+    exit;
+}
 
 $resultado = adjuntos_guardar($pdo, $id_incidencia, $_FILES['adjunto'] ?? []);
 

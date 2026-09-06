@@ -6,6 +6,7 @@ require_once __DIR__ . '/../src/arranque.php';
 $aviso = '';
 $error = '';
 $yo = auth_usuario();
+$seguridad_cuentas_disponible = cuenta_seguridad_esquema_disponible($pdo);
 
 /** true si el usuario indicado es el ultimo administrador activo. */
 function es_ultimo_admin(PDO $pdo, int $id): bool {
@@ -16,8 +17,13 @@ function es_ultimo_admin(PDO $pdo, int $id): bool {
     return (int)$stmt->fetchColumn() === 0;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $accion = (string)($_POST['accion'] ?? '');
+    $acciones_con_migracion = ['editar', 'estado', 'password', 'enviar_recuperacion', 'desactivar_2fa'];
+    if (!$seguridad_cuentas_disponible && in_array($accion, $acciones_con_migracion, true)) {
+        $error = 'Falta aplicar la migracion de seguridad. Ejecuta php vendor/bin/phinx migrate -e principal.';
+        $accion = '';
+    }
 
     if ($accion === 'crear' || $accion === 'editar') {
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
@@ -34,11 +40,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Rol no valido.';
         } elseif ($rol !== 'cliente' && $cliente_id !== null) {
             $error = 'La empresa solo puede asignarse a usuarios con rol cliente. Cambia el rol a "Cliente" o deja la empresa en blanco.';
+        } elseif ($accion === 'editar' && $password !== '' && cuenta_password_error($password) !== null) {
+            $error = (string)cuenta_password_error($password);
         }
 
         if ($error === '' && $accion === 'crear') {
-            if (strlen($password) < 10) {
-                $error = 'La contrasena debe tener al menos 10 caracteres.';
+            if (cuenta_password_error($password) !== null) {
+                $error = (string)cuenta_password_error($password);
             } else {
                 try {
                     $pdo->prepare(
@@ -71,17 +79,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($error === '') {
                 try {
+                    $anteriorStmt = $pdo->prepare("SELECT rol, activo FROM usuarios WHERE id = :id");
+                    $anteriorStmt->execute([':id' => $id]);
+                    $anterior = $anteriorStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                    $revocarSesiones = ($anterior['rol'] ?? $rol) !== $rol
+                        || (int)($anterior['activo'] ?? $activo) !== $activo;
                     $pdo->prepare(
-                        "UPDATE usuarios SET nombre = :n, email = :e, rol = :r, cliente_id = :c, activo = :a WHERE id = :id"
+                        "UPDATE usuarios SET nombre = :n, email = :e, rol = :r, cliente_id = :c, activo = :a,
+                         sesion_version = sesion_version + :revocar WHERE id = :id"
                     )->execute([
                         ':n' => $nombre, ':e' => $email, ':r' => $rol,
-                        ':c' => $cliente_id, ':a' => $activo, ':id' => $id,
+                        ':c' => $cliente_id, ':a' => $activo,
+                        ':revocar' => $revocarSesiones ? 1 : 0, ':id' => $id,
                     ]);
                     // Si deja de ser asignable (rol no operativo o cuenta
                     // desactivada), sus tickets abiertos vuelven a la cola.
                     if (!in_array($rol, ['admin', 'operador'], true) || !$activo) {
                         $desasignadas = $pdo->prepare(
-                            "UPDATE incidencias SET asignado_id = NULL WHERE asignado_id = :id AND estado <> 'cerrada'"
+                            "UPDATE incidencias SET asignado_id = NULL WHERE asignado_id = :id AND estado IN ('abierta','en_curso')"
                         );
                         $desasignadas->execute([':id' => $id]);
                         if ($desasignadas->rowCount() > 0) {
@@ -89,18 +104,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $aviso = $desasignadas->rowCount() . ' tickets abiertos del usuario han vuelto a la cola de sin asignar. ';
                         }
                     }
-                    if (strlen($password) >= 10) {
-                        $pdo->prepare("UPDATE usuarios SET hash_password = :h WHERE id = :id")
+                    if ($password !== '' && cuenta_password_error($password) === null) {
+                        $pdo->prepare("UPDATE usuarios SET hash_password = :h, sesion_version = sesion_version + 1 WHERE id = :id")
                             ->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $id]);
-                    } elseif ($password !== '') {
-                        $error = 'La contrasena no se cambio: debe tener al menos 10 caracteres.';
+                        cuenta_recuperaciones_invalidar($pdo, $id);
                     }
                     auditar($pdo, 'editar_usuario', "usuario #$id ($email)");
-                    if ($error === '') {
-                        $aviso .= 'Usuario actualizado.';
-                    }
+                    $aviso .= 'Usuario actualizado.';
                 } catch (PDOException $e) {
-                    $error = 'Ya existe otro usuario con ese email.';
+                    if ($e->getCode() === '23000') {
+                        $error = 'Ya existe otro usuario con ese email.';
+                    } else {
+                        error_log('TicketIA editar usuario: ' . $e->getMessage());
+                        $error = 'No se pudo actualizar el usuario. Revisa las migraciones e intentalo de nuevo.';
+                    }
                 }
             }
         }
@@ -119,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if ($error === '' && $id) {
-            $pdo->prepare("UPDATE usuarios SET activo = 1 - activo WHERE id = :id")->execute([':id' => $id]);
+            $pdo->prepare("UPDATE usuarios SET activo = 1 - activo, sesion_version = sesion_version + 1 WHERE id = :id")->execute([':id' => $id]);
             auditar($pdo, 'cambiar_estado_usuario', "usuario #$id");
             $aviso = 'Estado actualizado.';
         }
@@ -138,13 +155,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accion === 'password') {
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         $password = (string)($_POST['password'] ?? '');
-        if (!$id || strlen($password) < 10) {
-            $error = 'La nueva contrasena debe tener al menos 10 caracteres.';
+        $errorPassword = cuenta_password_error($password);
+        if (!$id) {
+            $error = 'Usuario no valido.';
+        } elseif ($errorPassword !== null) {
+            $error = $errorPassword;
         } else {
-            $pdo->prepare("UPDATE usuarios SET hash_password = :h, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = :id")
-                ->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $id]);
-            auditar($pdo, 'reset_password', "usuario #$id");
-            $aviso = 'Contrasena actualizada.';
+            try {
+                $stmt = $pdo->prepare(
+                    "UPDATE usuarios SET hash_password = :h, intentos_fallidos = 0, bloqueado_hasta = NULL,
+                     sesion_version = sesion_version + 1 WHERE id = :id"
+                );
+                $stmt->execute([':h' => password_hash($password, auth_algoritmo_hash()), ':id' => $id]);
+                if ($stmt->rowCount() !== 1) {
+                    $error = 'El usuario ya no existe.';
+                } else {
+                    cuenta_recuperaciones_invalidar($pdo, (int)$id);
+                    auditar($pdo, 'reset_password', "usuario #$id");
+                    $aviso = 'Contrasena actualizada y sesiones anteriores revocadas.';
+                }
+            } catch (PDOException $e) {
+                error_log('TicketIA cambiar contrasena: ' . $e->getMessage());
+                $error = 'No se pudo actualizar la contrasena. Revisa las migraciones e intentalo de nuevo.';
+            }
+        }
+    }
+
+    if ($accion === 'enviar_recuperacion') {
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $stmt = $pdo->prepare("SELECT email FROM usuarios WHERE id = :id AND activo = 1");
+            $stmt->execute([':id' => $id]);
+            $emailRecuperacion = $stmt->fetchColumn();
+            if ($emailRecuperacion) {
+                cuenta_recuperacion_solicitar($pdo, (string)$emailRecuperacion);
+            }
+            $aviso = 'Solicitud de recuperacion procesada. El envio depende de la configuracion SMTP.';
+        }
+    }
+
+    if ($accion === 'desactivar_2fa') {
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if ($id) {
+            try {
+                cuenta_2fa_desactivar($pdo, (int)$id);
+                if ((int)$id === (int)$yo['id']) {
+                    $_SESSION['usuario']['sesion_version'] = (int)($_SESSION['usuario']['sesion_version'] ?? 1) + 1;
+                }
+                auditar($pdo, 'admin_desactivar_2fa', "usuario #$id");
+                $aviso = 'Segundo factor desactivado y sesiones anteriores revocadas.';
+            } catch (Throwable $e) {
+                $error = 'No se pudo desactivar el segundo factor.';
+            }
         }
     }
 }
@@ -159,7 +221,7 @@ $filtro_rol = in_array($_GET['rol'] ?? '', $roles_validos, true) ? (string)$_GET
 $filtro_estado = in_array($_GET['estado'] ?? '', ['activos', 'desactivados', 'bloqueados'], true) ? (string)$_GET['estado'] : '';
 
 $sql = "SELECT u.*, c.nombre AS empresa,
-               (SELECT COUNT(*) FROM incidencias i WHERE i.asignado_id = u.id AND i.estado <> 'cerrada') AS tickets_abiertos
+               (SELECT COUNT(*) FROM incidencias i WHERE i.asignado_id = u.id AND i.estado IN ('abierta','en_curso')) AS tickets_abiertos
         FROM usuarios u
         LEFT JOIN clientes c ON c.id = u.cliente_id
         WHERE 1=1";
@@ -179,7 +241,12 @@ if ($filtro_estado === 'activos') {
 } elseif ($filtro_estado === 'bloqueados') {
     $sql .= " AND u.bloqueado_hasta IS NOT NULL AND u.bloqueado_hasta > NOW()";
 }
-$sql .= " ORDER BY u.nombre";
+$conteo = $pdo->prepare('SELECT COUNT(*) FROM usuarios u LEFT JOIN clientes c ON c.id=u.cliente_id ' . substr($sql, strpos($sql, 'WHERE 1=1')));
+$conteo->execute($params);
+$total_usuarios = (int)$conteo->fetchColumn();
+$pagina = min(max(1, (int)($_GET['pagina'] ?? 1)), max(1, (int)ceil($total_usuarios / 25)));
+$offset = ($pagina - 1) * 25;
+$sql .= " ORDER BY u.nombre, u.id LIMIT 25 OFFSET $offset";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -203,11 +270,14 @@ if ($editar_id) {
     $editando = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_usuarios.php');
+ui_admin_cabecera('Personas y acceso', 'Gestiona el equipo y las cuentas de tus clientes.', 'admin_usuarios.php');
 ?>
 
 <?php if ($aviso !== ''): ?><div class="success-message"><?= ui_e($aviso) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="login-error"><?= ui_e($error) ?></div><?php endif; ?>
+<?php if (!$seguridad_cuentas_disponible): ?>
+    <div class="warning">La gestion segura de contrasenas y 2FA requiere aplicar la ultima migracion.</div>
+<?php endif; ?>
 
 <section class="stat-strip">
     <div class="stat"><span class="stat-value"><?= (int)$stats['total'] ?></span><span class="stat-label">Total</span></div>
@@ -218,7 +288,8 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
     <div class="stat <?= (int)$stats['bloqueados'] > 0 ? 'stat-alerta' : '' ?>"><span class="stat-value"><?= (int)$stats['bloqueados'] ?></span><span class="stat-label">Bloqueados</span></div>
 </section>
 
-<div class="incidencia-box compact-box">
+<details class="incidencia-box compact-box admin-editor" <?= $editando || $error !== '' || isset($_GET['nuevo']) ? 'open' : '' ?>>
+    <summary><?= $editando ? 'Editar cuenta' : '+ Crear usuario' ?><span>Identidad, permisos y acceso</span></summary>
     <div class="section-head">
         <h2><?= $editando ? 'Editar usuario' : 'Crear usuario' ?></h2>
         <?php if ($editando): ?>
@@ -239,7 +310,8 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
         </div>
         <div class="filter-field">
             <label class="filter-label" for="password"><?= $editando ? 'Nueva contrasena (opcional)' : 'Contrasena (min. 10)' ?></label>
-            <input type="password" id="password" name="password" <?= $editando ? '' : 'required' ?> minlength="10" autocomplete="new-password">
+            <input type="password" id="password" name="password" <?= $editando ? '' : 'required' ?>
+                   minlength="<?= CUENTA_PASSWORD_MIN ?>" maxlength="4096" autocomplete="new-password">
         </div>
         <div class="filter-field">
             <label class="filter-label" for="rol">Rol</label>
@@ -281,20 +353,20 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
             <button type="submit" class="filter-button"><?= $editando ? 'Guardar cambios' : 'Crear' ?></button>
         </div>
     </form>
-</div>
+</details>
 
 <div class="incidencia-box compact-box">
     <div class="section-head">
-        <h2>Cuentas (<?= count($usuarios) ?>)</h2>
+        <h2>Directorio <span class="record-count"><?= $total_usuarios ?></span></h2>
         <form method="GET" class="page-tools">
-            <input type="text" name="q" placeholder="Buscar nombre o email" value="<?= ui_e($filtro_q) ?>" style="max-width:220px;">
-            <select name="rol" onchange="this.form.submit()">
+            <input type="search" name="q" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email" value="<?= ui_e($filtro_q) ?>">
+            <select name="rol" aria-label="Filtrar por rol" onchange="this.form.submit()">
                 <option value="">Todos los roles</option>
                 <?php foreach ($roles_validos as $r): ?>
                     <option value="<?= $r ?>" <?= $filtro_rol === $r ? 'selected' : '' ?>><?= ucfirst($r) ?></option>
                 <?php endforeach; ?>
             </select>
-            <select name="estado" onchange="this.form.submit()">
+            <select name="estado" aria-label="Filtrar por estado" onchange="this.form.submit()">
                 <option value="">Todos</option>
                 <option value="activos" <?= $filtro_estado === 'activos' ? 'selected' : '' ?>>Activos</option>
                 <option value="desactivados" <?= $filtro_estado === 'desactivados' ? 'selected' : '' ?>>Desactivados</option>
@@ -303,9 +375,10 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
             <button type="submit" class="card-button secondary-button">Filtrar</button>
         </form>
     </div>
-    <table class="logs-table">
+    <?php if (!$usuarios): ?><div class="admin-empty"><strong>No hay cuentas en esta vista</strong><span>Prueba con otro filtro o crea un usuario.</span><a href="admin_usuarios.php">Limpiar filtros</a></div><?php endif; ?>
+    <div class="table-scroll"><table class="logs-table">
         <thead>
-            <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Empresa</th><th>Estado</th><th>Tickets abiertos</th><th>Ultimo acceso</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Empresa</th><th>Estado</th><th>2FA</th><th>Tickets abiertos</th><th>Ultimo acceso</th><th>Acciones</th></tr>
         </thead>
         <tbody>
             <?php foreach ($usuarios as $u): ?>
@@ -319,11 +392,13 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
                         <?= (int)$u['activo'] === 1 ? 'Activo' : 'Desactivado' ?>
                         <?= $bloqueado ? ' <span class="badge-interna">Bloqueado</span>' : '' ?>
                     </td>
+                    <td><?= !empty($u['totp_activado_en']) ? '<span class="security-state enabled">Activo</span>' : '<span class="security-state">No</span>' ?></td>
                     <td><?= (int)$u['tickets_abiertos'] ?></td>
                     <td><?= ui_e($u['ultimo_acceso'] ?? 'Nunca') ?></td>
                     <td>
                         <div class="usuarios-acciones">
                             <a class="card-button secondary-button boton-mini" href="admin_usuarios.php?editar=<?= (int)$u['id'] ?>">Editar</a>
+                            <details class="record-actions"><summary>Acceso y seguridad</summary><div class="record-actions-content">
                             <?php if ($bloqueado): ?>
                                 <form method="POST">
                                     <?= csrf_campo() ?>
@@ -338,19 +413,41 @@ ui_admin_cabecera('Usuarios', 'Cuentas, roles, bloqueos y actividad.', 'admin_us
                                 <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
                                 <button type="submit" class="card-button secondary-button boton-mini"><?= (int)$u['activo'] === 1 ? 'Desactivar' : 'Activar' ?></button>
                             </form>
-                            <form method="POST" onsubmit="var p = prompt('Nueva contrasena (minimo 10 caracteres):'); if (!p) return false; this.password.value = p; return true;">
+                            <details class="usuario-password-editor">
+                                <summary class="card-button secondary-button boton-mini">Contrasena</summary>
+                                <form method="POST" class="usuario-password-form">
+                                    <?= csrf_campo() ?>
+                                    <input type="hidden" name="accion" value="password">
+                                    <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+                                    <label class="sr-only" for="password-<?= (int)$u['id'] ?>">Nueva contrasena</label>
+                                    <input type="password" id="password-<?= (int)$u['id'] ?>" name="password"
+                                           required minlength="<?= CUENTA_PASSWORD_MIN ?>" maxlength="4096"
+                                           autocomplete="new-password" placeholder="Minimo <?= CUENTA_PASSWORD_MIN ?> caracteres">
+                                    <button type="submit" class="filter-button boton-mini">Guardar</button>
+                                </form>
+                            </details>
+                            <form method="POST">
                                 <?= csrf_campo() ?>
-                                <input type="hidden" name="accion" value="password">
+                                <input type="hidden" name="accion" value="enviar_recuperacion">
                                 <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
-                                <input type="hidden" name="password" value="">
-                                <button type="submit" class="card-button secondary-button boton-mini">Contrasena</button>
+                                <button type="submit" class="card-button secondary-button boton-mini">Enviar acceso</button>
                             </form>
+                            <?php if (!empty($u['totp_activado_en'])): ?>
+                                <form method="POST" onsubmit="return confirm('Desactivar 2FA y revocar las sesiones anteriores de esta cuenta?');">
+                                    <?= csrf_campo() ?>
+                                    <input type="hidden" name="accion" value="desactivar_2fa">
+                                    <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+                                    <button type="submit" class="card-button secondary-button boton-mini">Quitar 2FA</button>
+                                </form>
+                            <?php endif; ?>
+                            </div></details>
                         </div>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
+    <?= ui_paginacion($pagina, $total_usuarios, 25, ['q'=>$filtro_q,'rol'=>$filtro_rol,'estado'=>$filtro_estado]) ?>
 </div>
 
 <?php ui_admin_pie(); ?>

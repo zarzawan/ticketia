@@ -1,6 +1,11 @@
 <?php
 require_once __DIR__ . '/../src/arranque.php';
 
+$ahora_bandeja = new DateTimeImmutable(date('Y-m-d H:i:s'));
+$fuente_bandeja = bandeja_fuente_sql($pdo, $ahora_bandeja);
+$campos_bandeja = 'id, titulo, resumen, tipo, urgencia, estado, fecha_creacion, fecha_resolucion, fecha_cierre,
+    asignado_id, asignado_nombre, cliente_nombre, nivel_servicio, ultimo_autor, primera_respuesta, ultima_actividad, mensajes_total';
+
 $mensaje_exito = isset($_GET['ok']) && $_GET['ok'] == '1';
 
 $ia_model = [];
@@ -41,15 +46,31 @@ $tipos = dominio_tipos();
 $urgencias = dominio_urgencias();
 $estados = dominio_estados();
 $ordenes = dominio_ordenes();
-$limites_validos = [20, 50, 100, 0];
+$limites_validos = [20, 50, 100];
+$colas_validas = ['', 'accion', 'sla', 'espera'];
+$cola = in_array((string)($_GET['cola'] ?? ''), $colas_validas, true) ? (string)($_GET['cola'] ?? '') : '';
+$vista = in_array((string)($_GET['vista'] ?? ''), ['kanban', 'lista'], true) ? (string)($_GET['vista'] ?? '') : 'kanban';
 
 $busqueda = isset($_GET['busqueda']) ? trim($_GET['busqueda']) : '';
 $filtro_tipo = isset($_GET['filtro_tipo']) && in_array($_GET['filtro_tipo'], $tipos, true) ? $_GET['filtro_tipo'] : '';
 $filtro_urgencia = isset($_GET['filtro_urgencia']) && in_array($_GET['filtro_urgencia'], $urgencias, true) ? $_GET['filtro_urgencia'] : '';
 $filtro_estado = isset($_GET['filtro_estado']) && in_array($_GET['filtro_estado'], $estados, true) ? $_GET['filtro_estado'] : '';
+if ($filtro_estado === 'cerrada') {
+    $queryHistorial = ['vista' => 'recientes'];
+    if ($busqueda !== '') $queryHistorial['busqueda'] = $busqueda;
+    header('Location: archivo.php?' . http_build_query($queryHistorial));
+    exit;
+}
 $filtro_desde = isset($_GET['filtro_desde']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_desde']) ? $_GET['filtro_desde'] : '';
 $filtro_hasta = isset($_GET['filtro_hasta']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['filtro_hasta']) ? $_GET['filtro_hasta'] : '';
 $orden = isset($_GET['orden']) && in_array($_GET['orden'], $ordenes, true) ? $_GET['orden'] : 'id_desc';
+$columnas_ordenables = ['prioridad', 'incidencia', 'cliente', 'estado', 'turno', 'sla', 'responsable', 'actividad'];
+$orden_columna = isset($_GET['orden_columna']) && in_array($_GET['orden_columna'], $columnas_ordenables, true)
+    ? (string)$_GET['orden_columna']
+    : '';
+$direccion_orden = isset($_GET['direccion']) && in_array($_GET['direccion'], ['asc', 'desc'], true)
+    ? (string)$_GET['direccion']
+    : 'desc';
 $asignables = usuarios_asignables($pdo);
 $asignables_ids = array_map(fn($u) => (string)$u['id'], $asignables);
 $filtro_asignado = '';
@@ -64,8 +85,20 @@ if (!in_array($limite, $limites_validos, true)) {
     $limite = 50;
 }
 
+$total_filtros_activos = count(array_filter([
+    $busqueda,
+    $filtro_tipo,
+    $filtro_urgencia,
+    $filtro_estado,
+    $filtro_desde,
+    $filtro_hasta,
+    $filtro_asignado,
+], static fn(string $valor): bool => $valor !== ''));
+$hay_filtros_aplicados = $total_filtros_activos > ($busqueda !== '' ? 1 : 0);
+
 // Delegan en lib/dominio.php manteniendo la firma usada por esta pagina.
 function appendCommonFilters(&$sql, &$params, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado = ''): void {
+    global $cola;
     dominio_append_filtros($sql, $params, [
         'busqueda' => $busqueda,
         'tipo' => $filtro_tipo,
@@ -75,18 +108,24 @@ function appendCommonFilters(&$sql, &$params, $busqueda, $filtro_tipo, $filtro_u
         'hasta' => $filtro_hasta,
         'asignado' => $filtro_asignado
     ]);
+
+    // La bandeja diaria nunca arrastra trabajo finalizado. Las soluciones
+    // pendientes solo aparecen cuando el usuario abre esa cola expresamente.
+    if ($filtro_estado === '') {
+        $sql .= " AND estado IN ('abierta','en_curso')";
+    }
+
+    bandeja_append_cola($sql, $cola);
 }
 
 function appendFiltersWithoutTipo(&$sql, &$params, $busqueda, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado = ''): void {
     appendCommonFilters($sql, $params, $busqueda, '', $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
 }
 
-function getOrderByClause(string $orden): string {
-    return dominio_order_by($orden);
-}
-
 function buildQueryUrl(array $updates = [], array $remove = []): string {
     $query = $_GET;
+    // Cambiar filtros, vista u orden vuelve al principio de la cola.
+    foreach (['pagina', 'pagina_abierta', 'pagina_en_curso', 'pagina_resuelta'] as $clave) unset($query[$clave]);
 
     foreach ($remove as $key) {
         unset($query[$key]);
@@ -124,15 +163,7 @@ function formatHoursToSpan($hours): string {
     return $dias . 'd ' . $restoHoras . 'h';
 }
 
-$sql_tipos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo IS NOT NULL";
-$params_tipos = [];
-appendCommonFilters($sql_tipos, $params_tipos, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
-$sql_tipos .= " GROUP BY tipo ORDER BY total DESC";
-$stmt_tipos = $pdo->prepare($sql_tipos);
-$stmt_tipos->execute($params_tipos);
-$datos_tipos = $stmt_tipos->fetchAll(PDO::FETCH_ASSOC);
-
-$sql_departamentos = "SELECT tipo, COUNT(*) as total FROM incidencias WHERE tipo IS NOT NULL";
+$sql_departamentos = "SELECT tipo, COUNT(*) as total FROM $fuente_bandeja WHERE tipo IS NOT NULL";
 $params_departamentos = [];
 appendFiltersWithoutTipo($sql_departamentos, $params_departamentos, $busqueda, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
 $sql_departamentos .= " GROUP BY tipo ORDER BY tipo ASC";
@@ -147,15 +178,7 @@ foreach ($datos_departamentos as $departamento) {
     }
 }
 
-$sql_urgencias = "SELECT urgencia, COUNT(*) as total FROM incidencias WHERE 1=1";
-$params_urgencias = [];
-appendCommonFilters($sql_urgencias, $params_urgencias, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
-$sql_urgencias .= " GROUP BY urgencia";
-$stmt_urgencias = $pdo->prepare($sql_urgencias);
-$stmt_urgencias->execute($params_urgencias);
-$datos_urgencias = $stmt_urgencias->fetchAll(PDO::FETCH_ASSOC);
-
-$sql_estados = "SELECT estado, COUNT(*) as total FROM incidencias WHERE 1=1";
+$sql_estados = "SELECT estado, COUNT(*) as total FROM $fuente_bandeja WHERE 1=1";
 $params_estados = [];
 appendCommonFilters($sql_estados, $params_estados, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
 $sql_estados .= " GROUP BY estado";
@@ -170,15 +193,15 @@ $sql_kpi = "
         SUM(estado = 'en_curso') AS en_curso,
         SUM(estado = 'cerrada') AS cerradas,
         SUM(urgencia = 'critico') AS criticas,
-        SUM(urgencia = 'critico' AND estado <> 'cerrada') AS criticas_abiertas,
-        SUM(estado <> 'cerrada' AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
-        SUM(asignado_id IS NULL AND estado <> 'cerrada') AS sin_asignar,
-        SUM(asignado_id = :kpi_yo AND estado <> 'cerrada') AS mios,
+        SUM(urgencia = 'critico' AND estado IN ('abierta','en_curso')) AS criticas_abiertas,
+        SUM(estado IN ('abierta','en_curso') AND TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) >= 48) AS abiertas_48h,
+        SUM(asignado_id IS NULL AND estado IN ('abierta','en_curso')) AS sin_asignar,
+        SUM(asignado_id = :kpi_yo AND estado IN ('abierta','en_curso')) AS mios,
         SUM(tipo = 'Comercial') AS comerciales,
         AVG(CASE WHEN fecha_cierre IS NOT NULL THEN TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_cierre) END) AS ttr_horas,
-        AVG(CASE WHEN estado <> 'cerrada' THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
-        MAX(CASE WHEN estado <> 'cerrada' THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS incidencia_mas_antigua_h
-    FROM incidencias
+        AVG(CASE WHEN estado IN ('abierta','en_curso') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS edad_media_abiertas_h,
+        MAX(CASE WHEN estado IN ('abierta','en_curso') THEN TIMESTAMPDIFF(HOUR, fecha_creacion, NOW()) END) AS incidencia_mas_antigua_h
+    FROM $fuente_bandeja
     WHERE 1=1
 ";
 $params_kpi = [':kpi_yo' => (int)(auth_usuario()['id'] ?? 0)];
@@ -193,87 +216,59 @@ $kpi_criticas = (int)($kpi['criticas'] ?? 0);
 $kpi_ratio_cierre = $kpi_total > 0 ? round(($kpi_cerradas / $kpi_total) * 100, 1) : 0;
 $kpi_ratio_criticas = $kpi_total > 0 ? round(($kpi_criticas / $kpi_total) * 100, 1) : 0;
 
-$sql_trend_creadas = "SELECT DATE(fecha_creacion) AS dia, COUNT(*) AS total FROM incidencias WHERE 1=1";
-$params_trend_creadas = [];
-appendCommonFilters($sql_trend_creadas, $params_trend_creadas, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
-$sql_trend_creadas .= " GROUP BY DATE(fecha_creacion) ORDER BY dia DESC LIMIT 14";
-$stmt_trend_creadas = $pdo->prepare($sql_trend_creadas);
-$stmt_trend_creadas->execute($params_trend_creadas);
-$rows_trend_creadas = array_reverse($stmt_trend_creadas->fetchAll(PDO::FETCH_ASSOC));
-
-$sql_trend_cerradas = "SELECT DATE(fecha_cierre) AS dia, COUNT(*) AS total FROM incidencias WHERE fecha_cierre IS NOT NULL";
-$params_trend_cerradas = [];
-appendCommonFilters($sql_trend_cerradas, $params_trend_cerradas, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
-$sql_trend_cerradas .= " GROUP BY DATE(fecha_cierre) ORDER BY dia DESC LIMIT 14";
-$stmt_trend_cerradas = $pdo->prepare($sql_trend_cerradas);
-$stmt_trend_cerradas->execute($params_trend_cerradas);
-$rows_trend_cerradas = array_reverse($stmt_trend_cerradas->fetchAll(PDO::FETCH_ASSOC));
-
-$creadas_por_dia = [];
-foreach ($rows_trend_creadas as $row) {
-    $dia = (string)($row['dia'] ?? '');
-    if ($dia !== '') {
-        $creadas_por_dia[$dia] = (int)$row['total'];
-    }
-}
-
-$cerradas_por_dia = [];
-foreach ($rows_trend_cerradas as $row) {
-    $dia = (string)($row['dia'] ?? '');
-    if ($dia !== '') {
-        $cerradas_por_dia[$dia] = (int)$row['total'];
-    }
-}
-
-$trend_labels = array_values(array_unique(array_merge(array_keys($creadas_por_dia), array_keys($cerradas_por_dia))));
-sort($trend_labels);
-$trend_data_creadas = [];
-$trend_data_cerradas = [];
-foreach ($trend_labels as $label) {
-    $trend_data_creadas[] = (int)($creadas_por_dia[$label] ?? 0);
-    $trend_data_cerradas[] = (int)($cerradas_por_dia[$label] ?? 0);
-}
-
 $kanban_data = [
     'abierta' => [],
     'en_curso' => [],
     'cerrada' => []
 ];
-$estados_kanban = $filtro_estado ? [$filtro_estado] : $estados;
-$kanban_limit = $limite === 0 ? 200 : min($limite, 100);
+$estados_kanban = $filtro_estado ? [$filtro_estado] : dominio_estados_activos();
+$kanban_limit = $limite;
+$paginas_kanban = [];
+$totales_por_estado = array_fill_keys($estados, 0);
+foreach ($datos_estados as $dato) $totales_por_estado[$dato['estado']] = (int)$dato['total'];
 
-foreach ($estados_kanban as $estado_kanban) {
-    $sql_kanban = "SELECT id, titulo, resumen, tipo, urgencia, estado, fecha_creacion, asignado_id,
-                          (SELECT nombre FROM usuarios u WHERE u.id = incidencias.asignado_id) AS asignado_nombre
-                   FROM incidencias WHERE estado = :estado";
+if ($vista === 'kanban') foreach ($estados_kanban as $estado_kanban) {
+    $sql_kanban = "SELECT $campos_bandeja FROM $fuente_bandeja WHERE estado = :estado";
     $params_kanban = [':estado' => $estado_kanban];
 
-    appendCommonFilters($sql_kanban, $params_kanban, $busqueda, $filtro_tipo, $filtro_urgencia, '', $filtro_desde, $filtro_hasta, $filtro_asignado);
-    $sql_kanban .= " ORDER BY " . getOrderByClause($orden) . " LIMIT " . (int)$kanban_limit;
+    appendCommonFilters($sql_kanban, $params_kanban, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
+    $pagina_columna = max(1, min((int)($_GET['pagina_' . $estado_kanban] ?? 1), max(1, (int)ceil($totales_por_estado[$estado_kanban] / $kanban_limit))));
+    $paginas_kanban[$estado_kanban] = $pagina_columna;
+    $sql_kanban .= " ORDER BY " . bandeja_orden_sql('', '', $orden) . " LIMIT " . $kanban_limit . " OFFSET " . (($pagina_columna - 1) * $kanban_limit);
 
     $stmt_kanban = $pdo->prepare($sql_kanban);
     $stmt_kanban->execute($params_kanban);
     $kanban_data[$estado_kanban] = $stmt_kanban->fetchAll(PDO::FETCH_ASSOC);
+
 }
 
-// Totales reales por estado (con filtros) para el contador "mostrando X de Y".
-$totales_por_estado = array_fill_keys($estados, 0);
-foreach ($datos_estados as $dato_estado) {
-    $clave_estado = (string)($dato_estado['estado'] ?? '');
-    if (array_key_exists($clave_estado, $totales_por_estado)) {
-        $totales_por_estado[$clave_estado] = (int)$dato_estado['total'];
-    }
+function sortableTableHeader(string $columna, string $etiqueta, string $orden_columna, string $direccion_orden): string {
+    $activa = $orden_columna === $columna;
+    $siguiente_direccion = $activa && $direccion_orden === 'desc' ? 'asc' : 'desc';
+    $indicador = $activa ? ($direccion_orden === 'desc' ? '&darr;' : '&uarr;') : '&varr;';
+    $aria_sort = $activa ? ($direccion_orden === 'desc' ? 'descending' : 'ascending') : 'none';
+    $url = ui_e(buildQueryUrl([
+        'vista' => 'lista',
+        'orden_columna' => $columna,
+        'direccion' => $siguiente_direccion,
+    ]));
+    $clase = $activa ? 'sortable-column active' : 'sortable-column';
+
+    return "<th aria-sort='{$aria_sort}'><a class='{$clase}' href='{$url}'><span>" . ui_e($etiqueta) . "</span><span class='sort-indicator' aria-hidden='true'>{$indicador}</span></a></th>";
 }
 
-// Siguiente tramo del selector de limite para el boton "Ver mas".
-$siguiente_limite = null;
-if ($limite === 20) {
-    $siguiente_limite = 50;
-} elseif ($limite === 50) {
-    $siguiente_limite = 100;
-} elseif ($limite === 100) {
-    $siguiente_limite = 0;
+$pagina = max(1, min((int)($_GET['pagina'] ?? 1), max(1, (int)ceil($kpi_total / $limite))));
+$lista_data = [];
+if ($vista === 'lista') {
+    $sql_lista = "SELECT $campos_bandeja FROM $fuente_bandeja WHERE 1=1";
+    $params_lista = [];
+    appendCommonFilters($sql_lista, $params_lista, $busqueda, $filtro_tipo, $filtro_urgencia, $filtro_estado, $filtro_desde, $filtro_hasta, $filtro_asignado);
+    $sql_lista .= " ORDER BY " . bandeja_orden_sql($orden_columna, $direccion_orden, $orden) . " LIMIT " . $limite . " OFFSET " . (($pagina - 1) * $limite);
+    $stmt_lista = $pdo->prepare($sql_lista);
+    $stmt_lista->execute($params_lista);
+    $lista_data = $stmt_lista->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 ?>
 <!DOCTYPE html>
@@ -287,7 +282,7 @@ if ($limite === 20) {
     // Persistencia de filtros: al volver al panel sin parametros se restaura
     // el ultimo filtro aplicado (guardado en localStorage). "Limpiar" lo borra.
     (function () {
-        var clavesFiltro = ['busqueda', 'filtro_tipo', 'filtro_urgencia', 'filtro_estado', 'filtro_desde', 'filtro_hasta', 'filtro_asignado', 'orden', 'limite'];
+        var clavesFiltro = ['busqueda', 'filtro_tipo', 'filtro_urgencia', 'filtro_estado', 'filtro_desde', 'filtro_hasta', 'filtro_asignado', 'orden', 'limite', 'cola'];
         var actuales = new URLSearchParams(window.location.search);
         var tieneFiltros = clavesFiltro.some(function (k) { return actuales.has(k); });
 
@@ -306,39 +301,66 @@ if ($limite === 20) {
         if (guardados) {
             // Conservar parametros de estado (ok, error, proveedor_ok) al restaurar.
             var destino = new URLSearchParams(guardados);
+            // La vista no es un filtro persistente: entrar al panel vuelve a la lista.
+            destino.delete('vista');
             actuales.forEach(function (v, k) { destino.set(k, v); });
             window.location.replace('index.php?' + destino.toString());
         }
     })();
     </script>
-    <link rel="stylesheet" href="estilos.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
 </head>
-<body>
-<div class="container">
-    <header class="page-header">
-        <div>
-            <h1>TicketIA</h1>
-            <p class="subtitulo">Gestion, analisis y seguimiento en una sola vista.</p>
-        </div>
-        <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="filter-button secondary" type="button">Cambiar tema</button></div>
+<body class="support-body support-simple-board">
+<div class="support-shell">
+    <?= ui_support_nav($filtro_asignado === 'sin_asignar' ? 'sin_asignar' : ($cola !== '' ? $cola : 'tickets')) ?>
+    <main class="support-main">
+    <header class="support-topbar">
+        <button id="supportMenuToggle" class="support-menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">Menu</button>
+        <div><span class="support-eyebrow">Espacio de soporte</span><h1>Trabajo activo</h1><p class="subtitulo">Lo que necesita una accion del equipo, sin ruido historico.</p></div>
+        <div class="usuario-zona"><?= ui_menu_usuario() ?><button id="themeToggle" class="theme-button" type="button">Tema</button></div>
     </header>
+<div class="container support-content">
 
     <?php if ($mensaje_exito): ?>
         <div class="success-message">Incidencia registrada correctamente.</div>
     <?php endif; ?>
+    <?php if (isset($_GET['masivo'])): ?>
+        <div class="<?= ctype_digit((string)$_GET['masivo']) ? 'success-message' : 'login-error' ?>">
+            <?= ctype_digit((string)$_GET['masivo']) ? (int)$_GET['masivo'] . ' incidencias actualizadas.' : ($_GET['masivo'] === 'sin_seleccion' ? 'Selecciona al menos una incidencia y una accion.' : 'No se pudo completar la accion masiva.') ?>
+        </div>
+    <?php endif; ?>
 
     <div class="top-row-grid">
-        <div class="incidencia-box" id="filtros">
-            <h2>Filtros y departamentos</h2>
+        <form method="GET" action="index.php" class="queue-search" role="search">
+            <label class="sr-only" for="buscarCola">Buscar incidencias</label>
+            <input type="search" name="busqueda" id="buscarCola" value="<?= ui_e($busqueda) ?>" placeholder="Buscar por numero o texto">
+            <?php foreach (['vista'=>$vista, 'cola'=>$cola, 'filtro_estado'=>$filtro_estado, 'filtro_asignado'=>$filtro_asignado, 'filtro_tipo'=>$filtro_tipo, 'filtro_urgencia'=>$filtro_urgencia, 'filtro_desde'=>$filtro_desde, 'filtro_hasta'=>$filtro_hasta, 'orden'=>$orden, 'limite'=>$limite, 'orden_columna'=>$orden_columna, 'direccion'=>$direccion_orden] as $clave=>$valor): if ($valor === '') continue; ?>
+                <input type="hidden" name="<?= $clave ?>" value="<?= ui_e($valor) ?>">
+            <?php endforeach; ?>
+            <button class="card-button" type="submit">Buscar</button>
+        </form>
+        <details class="incidencia-box collapsible-panel filter-disclosure" id="filtros" <?= $hay_filtros_aplicados ? 'open' : '' ?>>
+            <summary class="collapsible-panel-summary">
+                <span><strong>Filtros</strong><small><?= $hay_filtros_aplicados ? $total_filtros_activos . ' filtros activos' : 'Afina la bandeja solo cuando lo necesites' ?></small></span>
+                <span class="collapsible-panel-action"><?= $hay_filtros_aplicados ? $total_filtros_activos . ' activos' : 'Abrir' ?></span>
+            </summary>
+            <div class="collapsible-panel-body" id="filterPanelContent">
             <form method="GET" action="index.php" class="filter-form-modern" id="formFiltros">
-                <input type="hidden" name="filtro_tipo" value="<?= ui_e($filtro_tipo) ?>">
-                <input type="hidden" name="filtro_estado" value="<?= ui_e($filtro_estado) ?>">
-
                 <div class="filter-field">
-                    <label class="filter-label" for="busqueda">Buscar</label>
-                    <input type="text" id="busqueda" name="busqueda" value="<?= ui_e($busqueda) ?>" placeholder="Buscar por titulo, descripcion o ID...">
+                    <label class="filter-label" for="filtro_tipo">Departamento</label>
+                    <select name="filtro_tipo" id="filtro_tipo"><option value="">Todos los departamentos</option>
+                    <?php foreach ($tipos as $tipo): ?><option value="<?= ui_e($tipo) ?>" <?= $filtro_tipo === $tipo ? 'selected' : '' ?>><?= ui_e($tipo) ?></option><?php endforeach; ?>
+                    </select>
                 </div>
+                <input type="hidden" name="filtro_estado" value="<?= ui_e($filtro_estado) ?>">
+                <input type="hidden" name="vista" value="<?= ui_e($vista) ?>">
+                <input type="hidden" name="cola" value="<?= ui_e($cola) ?>">
+                <?php if ($orden_columna !== ''): ?>
+                    <input type="hidden" name="orden_columna" value="<?= ui_e($orden_columna) ?>">
+                    <input type="hidden" name="direccion" value="<?= ui_e($direccion_orden) ?>">
+                <?php endif; ?>
+
+                <input type="hidden" name="busqueda" value="<?= ui_e($busqueda) ?>">
 
                 <div class="filter-field">
                     <label class="filter-label" for="filtro_urgencia">Urgencia</label>
@@ -388,10 +410,9 @@ if ($limite === 20) {
                 <div class="filter-field">
                     <label class="filter-label" for="limite">Limite</label>
                     <select name="limite" id="limite">
-                        <option value="20" <?= $limite === 20 ? 'selected' : '' ?>>20 por estado</option>
-                        <option value="50" <?= $limite === 50 ? 'selected' : '' ?>>50 por estado</option>
-                        <option value="100" <?= $limite === 100 ? 'selected' : '' ?>>100 por estado</option>
-                        <option value="0" <?= $limite === 0 ? 'selected' : '' ?>>Sin limite</option>
+                        <option value="20" <?= $limite === 20 ? 'selected' : '' ?>>20 por pagina</option>
+                        <option value="50" <?= $limite === 50 ? 'selected' : '' ?>>50 por pagina</option>
+                        <option value="100" <?= $limite === 100 ? 'selected' : '' ?>>100 por pagina</option>
                     </select>
                 </div>
 
@@ -401,145 +422,60 @@ if ($limite === 20) {
                 </div>
             </form>
 
-            <p class="help-line">Filtro por departamento (cada categoria):</p>
-            <div class="departamentos-pills">
-                <a class="quick-pill <?= $filtro_tipo === '' ? 'active' : '' ?>" href="<?= ui_e(buildQueryUrl(['filtro_tipo' => ''], [])) ?>">
-                    Todos
-                </a>
-                <?php
-                $tipos_ordenados = $tipos;
-                natcasesort($tipos_ordenados);
-                foreach ($tipos_ordenados as $dep):
-                ?>
-                    <a class="quick-pill <?= $filtro_tipo === $dep ? 'active' : '' ?>" href="<?= ui_e(buildQueryUrl(['filtro_tipo' => $dep], [])) ?>">
-                        <?= ui_e($dep) ?> <span class="pill-count"><?= (int)($departamento_totales[$dep] ?? 0) ?></span>
-                    </a>
-                <?php endforeach; ?>
             </div>
-        </div>
+        </details>
 
-        <div class="incidencia-box top-insights-box">
-            <div class="top-insights-shell">
-                <section class="dashboard-summary">
-                    <div class="section-head dashboard-head">
-                        <div>
-                            <h2>Dashboard</h2>
-                            <p class="help-line">Resumen operativo compacto del panel.</p>
-                        </div>
-                        <button type="button" class="filter-button secondary dashboard-toggle" id="toggleDashboardCharts" aria-expanded="false" aria-controls="dashboardCharts">
-                            Ver graficos
-                        </button>
-                    </div>
 
-                    <?php
-                    // Cada estadistica es un enlace que aplica su filtro conservando el resto.
-                    $fecha_48h = date('Y-m-d', strtotime('-2 days'));
-                    $url_abiertas = buildQueryUrl(['filtro_estado' => 'abierta']);
-                    $url_en_curso = buildQueryUrl(['filtro_estado' => 'en_curso']);
-                    $url_criticas_abiertas = buildQueryUrl(['filtro_urgencia' => 'critico', 'filtro_estado' => '']);
-                    $url_sin_asignar = buildQueryUrl(['filtro_asignado' => 'sin_asignar']);
-                    $mi_id = (string)(int)(auth_usuario()['id'] ?? 0);
-                    $url_mios = buildQueryUrl(['filtro_asignado' => $mi_id]);
-                    $url_48h = buildQueryUrl(['filtro_hasta' => $fecha_48h, 'filtro_estado' => '']);
-                    $url_todas = buildQueryUrl([
-                        'busqueda' => '', 'filtro_tipo' => '', 'filtro_urgencia' => '', 'filtro_estado' => '',
-                        'filtro_desde' => '', 'filtro_hasta' => '', 'filtro_asignado' => '', 'orden' => 'id_desc'
-                    ]);
-                    $url_cerradas = buildQueryUrl(['filtro_estado' => 'cerrada']);
-                    $url_criticas = buildQueryUrl(['filtro_urgencia' => 'critico']);
-                    ?>
-                    <section class="stat-strip">
-                        <a class="stat <?= $filtro_estado === 'abierta' ? 'stat-activo' : '' ?>" href="<?= ui_e($url_abiertas) ?>" title="Filtrar incidencias abiertas">
-                            <span class="stat-value"><?= (int)($kpi['abiertas'] ?? 0) ?></span>
-                            <span class="stat-label">Abiertas</span>
-                        </a>
-                        <a class="stat <?= $filtro_estado === 'en_curso' ? 'stat-activo' : '' ?>" href="<?= ui_e($url_en_curso) ?>" title="Filtrar incidencias en curso">
-                            <span class="stat-value"><?= (int)($kpi['en_curso'] ?? 0) ?></span>
-                            <span class="stat-label">En curso</span>
-                        </a>
-                        <a class="stat <?= (int)($kpi['criticas_abiertas'] ?? 0) > 0 ? 'stat-alerta' : '' ?> <?= $filtro_urgencia === 'critico' && $filtro_estado === '' ? 'stat-activo' : '' ?>" href="<?= ui_e($url_criticas_abiertas) ?>" title="Filtrar incidencias criticas">
-                            <span class="stat-value"><?= (int)($kpi['criticas_abiertas'] ?? 0) ?></span>
-                            <span class="stat-label">Criticas abiertas</span>
-                        </a>
-                        <a class="stat <?= $filtro_asignado === 'sin_asignar' ? 'stat-activo' : '' ?>" href="<?= ui_e($url_sin_asignar) ?>" title="Filtrar incidencias sin asignar">
-                            <span class="stat-value"><?= (int)($kpi['sin_asignar'] ?? 0) ?></span>
-                            <span class="stat-label">Sin asignar</span>
-                        </a>
-                        <?php if (auth_es('admin', 'operador')): // solo roles asignables tienen cola propia ?>
-                        <a class="stat <?= $filtro_asignado === $mi_id ? 'stat-activo' : '' ?>" href="<?= ui_e($url_mios) ?>" title="Filtrar mis incidencias abiertas">
-                            <span class="stat-value"><?= (int)($kpi['mios'] ?? 0) ?></span>
-                            <span class="stat-label">Mis tickets</span>
-                        </a>
-                        <?php endif; ?>
-                        <a class="stat <?= $filtro_hasta === $fecha_48h ? 'stat-activo' : '' ?>" href="<?= ui_e($url_48h) ?>" title="Filtrar incidencias creadas hace mas de 48h">
-                            <span class="stat-value"><?= (int)($kpi['abiertas_48h'] ?? 0) ?></span>
-                            <span class="stat-label">Abiertas +48h</span>
-                        </a>
-                    </section>
-                    <p class="stat-secondary">
-                        <a href="<?= ui_e($url_todas) ?>" title="Ver todas las incidencias"><strong><?= $kpi_total ?></strong> totales</a>
-                        <a href="<?= ui_e($url_cerradas) ?>" title="Filtrar incidencias cerradas"><strong><?= (int)($kpi['cerradas'] ?? 0) ?></strong> cerradas (<?= $kpi_ratio_cierre ?>%)</a>
-                        <a href="<?= ui_e($url_criticas) ?>" title="Filtrar incidencias criticas"><strong><?= (int)($kpi['criticas'] ?? 0) ?></strong> criticas (<?= $kpi_ratio_criticas ?>%)</a>
-                        <span>TTR medio <strong><?= formatHoursToSpan($kpi['ttr_horas'] ?? null) ?></strong></span>
-                        <span>Edad media <strong><?= formatHoursToSpan($kpi['edad_media_abiertas_h'] ?? null) ?></strong></span>
-                        <span>Mas antigua <strong><?= formatHoursToSpan($kpi['incidencia_mas_antigua_h'] ?? null) ?></strong></span>
-                    </p>
-                </section>
+        <section class="support-queue-summary" aria-label="Bandeja de trabajo">
+            <div><strong><?= $kpi_total ?> <?= $kpi_total === 1 ? 'incidencia' : 'incidencias' ?></strong><span><?= $filtro_estado === 'resuelta' ? 'Esperando confirmacion del cliente' : 'Trabajo activo del equipo' ?></span></div>
+            <nav class="queue-shortcuts" aria-label="Colas rapidas">
+                <a href="<?= ui_e(buildQueryUrl(['cola' => 'accion', 'filtro_estado' => ''])) ?>" <?= $cola === 'accion' ? 'aria-current="page"' : '' ?>>Para responder</a>
+                <a href="<?= ui_e(buildQueryUrl(['filtro_asignado' => 'sin_asignar', 'filtro_estado' => '', 'cola' => ''])) ?>">Sin asignar</a>
+                <a href="<?= ui_e(buildQueryUrl(['cola' => 'sla', 'filtro_estado' => ''])) ?>" <?= $cola === 'sla' ? 'aria-current="page"' : '' ?>>SLA en riesgo</a>
+                <a href="<?= ui_e(buildQueryUrl(['cola' => '', 'filtro_estado' => 'resuelta'])) ?>" <?= $filtro_estado === 'resuelta' ? 'aria-current="page"' : '' ?>>Por confirmar</a>
+            </nav>
+        </section>
 
-                <aside class="ia-rail">
-                    <div>
-                        <h3>Analisis IA</h3>
-                        <p class="help-line">Resumen ejecutivo del backlog generado por IA.</p>
-                    </div>
-                    <div class="ia-rail-actions">
-                        <a href="<?= ui_e($ia_model['url']) ?>" class="card-button">General</a>
-                        <a href="analisis_seguridad.php" class="card-button secondary-button">Seguridad</a>
-                    </div>
-                    <form action="cambiar_proveedor.php" method="POST" class="ia-provider-form">
-                        <?= csrf_campo() ?>
-                        <label class="filter-label" for="selector_proveedor">Proveedor</label>
-                        <select name="proveedor" id="selector_proveedor" onchange="this.form.submit()">
-                            <?php foreach ($llm_config as $clave_proveedor => $conf_proveedor): ?>
-                                <?php if (!is_array($conf_proveedor) || !isset($conf_proveedor['label'])) continue; ?>
-                                <option value="<?= ui_e($clave_proveedor) ?>" <?= $llm_provider === $clave_proveedor ? 'selected' : '' ?>>
-                                    <?= ui_e($conf_proveedor['label']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </form>
-                    <a href="ver_logs_llm.php" class="ia-rail-link">Ver actividad IA ›</a>
-                </aside>
-            </div>
-
-            <section class="dashboard-charts-panel" id="dashboardCharts" hidden>
-                <div class="dashboard-grid">
-                    <div class="chart-container">
-                        <h3>Por tipo</h3>
-                        <canvas id="chart-tipos"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Por urgencia</h3>
-                        <canvas id="chart-urgencias"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Por estado</h3>
-                        <canvas id="chart-estados"></canvas>
-                    </div>
-                    <div class="chart-container chart-container-wide">
-                        <h3>Evolucion diaria (creadas vs cerradas)</h3>
-                        <canvas id="chart-evolucion"></canvas>
-                    </div>
-                </div>
-            </section>
-        </div>
     </div>
 
     <div class="incidencia-box">
         <div class="section-head">
-            <h2>Kanban de incidencias</h2>
-            <a class="card-button" href="<?= ui_e('exportar_csv.php?' . http_build_query($_GET)) ?>">Exportar CSV filtrado</a>
+            <div><span class="support-section-kicker">Operacion</span><h2><?= $filtro_estado === 'resuelta' ? 'Soluciones por confirmar' : ($vista === 'lista' ? 'Incidencias que atender' : 'Flujo activo') ?></h2><small>Mostrando <?= ($vista === 'lista' ? count($lista_data) : array_sum(array_map('count', $kanban_data))) ?> de <?= $kpi_total ?></small></div>
+            <div class="page-tools">
+                <span class="view-switch" aria-label="Cambiar vista">
+                    <a class="<?= $vista === 'kanban' ? 'active' : '' ?>" href="<?= ui_e(buildQueryUrl(['vista' => 'kanban'])) ?>">Kanban</a>
+                    <a class="<?= $vista === 'lista' ? 'active' : '' ?>" href="<?= ui_e(buildQueryUrl(['vista' => 'lista'])) ?>">Lista</a>
+                </span>
+                <a class="card-button secondary-button" href="<?= ui_e('exportar_csv.php?' . http_build_query($_GET)) ?>">Exportar CSV</a>
+            </div>
         </div>
-        <p class="help-line">Arrastra tarjetas entre columnas para cambiar el estado. En columnas con muchas incidencias se activa vista en dos subcolumnas.</p>
+        <form action="acciones_masivas.php" method="POST" id="formAccionesMasivas" class="bulk-form">
+            <?= csrf_campo() ?>
+            <details class="bulk-disclosure" id="bulkActions">
+                <summary>Acciones masivas</summary>
+            <div class="bulk-toolbar">
+                <label><input type="checkbox" id="seleccionarTodas"> Seleccionar visibles</label>
+                <span id="seleccionTotal">0 seleccionadas</span>
+                <span class="bulk-spacer"></span>
+                <select name="accion_masiva" required aria-label="Accion masiva">
+                    <option value="">Accion masiva...</option>
+                    <optgroup label="Estado">
+                        <option value="estado:abierta">Marcar abierta</option>
+                        <option value="estado:en_curso">Marcar en curso</option>
+                    </optgroup>
+                    <optgroup label="Asignacion">
+                        <option value="asignar:">Quitar asignacion</option>
+                        <?php foreach ($asignables as $asignable): ?>
+                            <option value="asignar:<?= (int)$asignable['id'] ?>">Asignar a <?= ui_e($asignable['nombre']) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                </select>
+                <button type="submit" class="card-button">Aplicar</button>
+            </div>
+            </details>
+        </form>
+        <?php if ($vista === 'kanban'): ?>
+        <p class="help-line">Arrastra las tarjetas entre columnas para cambiar su estado.</p>
         <div class="kanban-board" id="kanbanBoard">
             <?php foreach ($estados_kanban as $estado_columna): ?>
                 <?php
@@ -555,20 +491,67 @@ if ($limite === 20) {
                     </header>
                     <div class="<?= ui_e($dropzone_class) ?>">
                         <?php foreach ($kanban_data[$estado_columna] as $incidencia_k): ?>
-                            <?= ui_render_kanban_card($incidencia_k, $asignables) ?>
+                            <?= ui_render_kanban_card($incidencia_k, $asignables, true) ?>
                         <?php endforeach; ?>
-                        <?php if ($total_en_columna < $total_estado_bd && $siguiente_limite !== null): ?>
-                            <a class="card-button kanban-ver-mas" href="<?= ui_e(buildQueryUrl(['limite' => (string)$siguiente_limite])) ?>">
-                                Ver mas (<?= $total_estado_bd - $total_en_columna ?> ocultas)
-                            </a>
+                        <?php if ($total_estado_bd > $kanban_limit): ?>
+                            <nav class="pagination" aria-label="Paginacion de <?= ui_e(ui_estado_label($estado_columna)) ?>">
+                                <span>Pagina <?= $paginas_kanban[$estado_columna] ?> de <?= (int)ceil($total_estado_bd / $kanban_limit) ?></span>
+                                <?php foreach ([-1 => 'Anterior', 1 => 'Siguiente'] as $salto => $etiqueta): ?>
+                                    <?php $destino = $paginas_kanban[$estado_columna] + $salto; if ($destino < 1 || $destino > ceil($total_estado_bd / $kanban_limit)) continue; ?>
+                                    <a class="card-button secondary-button" href="<?= ui_e('index.php?' . http_build_query(array_merge($_GET, ['pagina_' . $estado_columna => $destino]))) ?>"><?= $etiqueta ?></a>
+                                <?php endforeach; ?>
+                            </nav>
                         <?php endif; ?>
                     </div>
                 </section>
             <?php endforeach; ?>
         </div>
+        <?php else: ?>
+            <div class="ticket-table-wrap">
+                <table class="ticket-table">
+                    <thead><tr>
+                        <th class="check-cell"></th>
+                        <?= sortableTableHeader('prioridad', 'Prioridad', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('incidencia', 'Incidencia', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('cliente', 'Cliente', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('estado', 'Estado', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('turno', 'Siguiente paso', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('sla', 'SLA', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('responsable', 'Responsable', $orden_columna, $direccion_orden) ?>
+                        <?= sortableTableHeader('actividad', 'Actividad', $orden_columna, $direccion_orden) ?>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($lista_data as $ticket): ?>
+                        <?php
+                        $slaFila = dominio_sla_calcular($ticket, $ahora_bandeja);
+                        $turnoFila = dominio_siguiente_paso($ticket['ultimo_autor'] ?? null, (string)$ticket['estado']);
+                        $prioridadInfoFila = dominio_prioridad_operativa_desglose($ticket, $ahora_bandeja);
+                        $prioridadFila = $prioridadInfoFila['total'];
+                        $prioridadTitulo = implode(' + ', array_map(static fn(array $f): string => $f['label'] . ' (' . $f['puntos'] . ')', $prioridadInfoFila['factores']));
+                        ?>
+                        <tr>
+                            <td class="check-cell"><input class="ticket-check" type="checkbox" name="ids[]" value="<?= (int)$ticket['id'] ?>" form="formAccionesMasivas" aria-label="Seleccionar incidencia <?= (int)$ticket['id'] ?>"></td>
+                            <td><span class="priority-score score-<?= $prioridadFila >= 70 ? 'high' : ($prioridadFila >= 40 ? 'medium' : 'low') ?>" title="<?= ui_e($prioridadTitulo) ?>"><?= $prioridadFila ?></span></td>
+                            <td class="ticket-title-cell"><a href="ver_incidencia.php?id=<?= (int)$ticket['id'] ?>"><strong>#<?= (int)$ticket['id'] ?> <?= ui_e($ticket['titulo']) ?></strong><small><?= ui_e($ticket['tipo'] ?: 'Sin clasificar') ?> · <?= (int)$ticket['mensajes_total'] ?> mensajes</small></a></td>
+                            <td><?= ui_e($ticket['cliente_nombre'] ?: 'Sin empresa') ?></td>
+                            <td><span class="status-pill pill-estado pill-<?= ui_e(ui_estado_class((string)$ticket['estado'])) ?>"><?= ui_e(ui_estado_label((string)$ticket['estado'])) ?></span></td>
+                            <td><span class="turn-badge <?= ui_e($turnoFila['clave']) ?>"><?= ui_e($turnoFila['label']) ?></span></td>
+                            <td><span class="sla-badge <?= ui_e($slaFila['estado']) ?>"><?= ui_e(dominio_duracion_humana((int)$slaFila['restante_segundos'])) ?></span></td>
+                            <td><?= ui_e($ticket['asignado_nombre'] ?: 'Sin asignar') ?></td>
+                            <td><time><?= ui_e(date('d/m H:i', strtotime((string)$ticket['ultima_actividad']))) ?></time></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($lista_data)): ?><tr><td colspan="9"><div class="empty-state"><strong>No hay incidencias en esta cola</strong><span>Prueba a limpiar filtros o cambiar de vista.</span></div></td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?= ui_paginacion($pagina, $kpi_total, $limite, $_GET) ?>
+        <?php endif; ?>
     </div>
 
-    <div class="incidencia-box">
+    <details class="incidencia-box create-ticket-disclosure" id="nuevaIncidencia">
+        <summary><span><strong>Abrir nueva incidencia</strong><small>La IA clasificara urgencia, departamento e idioma</small></span><span>Crear</span></summary>
+        <div class="create-ticket-body">
         <h2>Abrir nueva incidencia</h2>
         <p class="help-line" style="margin-top:-6px; margin-bottom:14px;">La IA clasificara urgencia, departamento e idioma automaticamente al crearla.</p>
         <form action="guardar_incidencia.php" method="POST" accept-charset="UTF-8" id="formNuevaIncidencia" class="form-stack alta-form">
@@ -590,8 +573,11 @@ if ($limite === 20) {
                 <input type="submit" value="Crear incidencia">
             </div>
         </form>
-    </div>
+        </div>
+    </details>
 
+</div>
+</main>
 </div>
 
 <script>
@@ -602,124 +588,36 @@ function limpiarFiltros() {
     window.location.href = 'index.php';
 }
 
-const datosTipos = {
-    labels: <?= json_encode(array_map(function ($dato) { return (string)$dato['tipo']; }, $datos_tipos), JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [{
-        label: 'Incidencias por tipo',
-        data: <?= json_encode(array_map(function ($dato) { return (int)$dato['total']; }, $datos_tipos)) ?>,
-        backgroundColor: ['#2f7de1', '#0e9f6e', '#f59f00', '#d9480f', '#7c3aed', '#0891b2', '#e03131'],
-        borderWidth: 0,
-        borderRadius: 8
-    }]
-};
-
-const datosUrgencias = {
-    labels: <?= json_encode(array_map(function ($dato) { return ui_urgencia_label((string)$dato['urgencia']); }, $datos_urgencias), JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [{
-        label: 'Incidencias por urgencia',
-        data: <?= json_encode(array_map(function ($dato) { return (int)$dato['total']; }, $datos_urgencias)) ?>,
-        backgroundColor: ['#e03131', '#f08c00', '#2f9e44'],
-        borderWidth: 0,
-        borderRadius: 8
-    }]
-};
-
-const datosEstados = {
-    labels: <?= json_encode(array_map(function ($dato) { return ui_estado_label((string)$dato['estado']); }, $datos_estados), JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [{
-        label: 'Incidencias por estado',
-        data: <?= json_encode(array_map(function ($dato) { return (int)$dato['total']; }, $datos_estados)) ?>,
-        backgroundColor: ['#1971c2', '#f08c00', '#2b8a3e'],
-        borderWidth: 0,
-        borderRadius: 8
-    }]
-};
-
-const datosEvolucion = {
-    labels: <?= json_encode($trend_labels, JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [
-        {
-            label: 'Creadas',
-            data: <?= json_encode($trend_data_creadas) ?>,
-            borderColor: '#1b74d4',
-            backgroundColor: 'rgba(27, 116, 212, 0.18)',
-            pointBackgroundColor: '#1b74d4',
-            tension: 0.25,
-            fill: false
-        },
-        {
-            label: 'Cerradas',
-            data: <?= json_encode($trend_data_cerradas) ?>,
-            borderColor: '#2f9e44',
-            backgroundColor: 'rgba(47, 158, 68, 0.18)',
-            pointBackgroundColor: '#2f9e44',
-            tension: 0.25,
-            fill: false
-        }
-    ]
-};
-
-const chartBaseOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-        y: {
-            beginAtZero: true,
-            ticks: { precision: 0 }
-        }
-    },
-    plugins: {
-        legend: { display: false }
-    }
-};
-
-const lineChartOptions = Object.assign({}, chartBaseOptions, {
-    plugins: {
-        legend: { display: true, position: 'bottom' }
-    }
-});
-
 document.addEventListener('DOMContentLoaded', () => {
-    let dashboardChartsInitialized = false;
-    const initDashboardCharts = () => {
-        if (dashboardChartsInitialized) {
-            return;
-        }
-
-        new Chart(document.getElementById('chart-tipos'), { type: 'bar', data: datosTipos, options: chartBaseOptions });
-        new Chart(document.getElementById('chart-urgencias'), { type: 'bar', data: datosUrgencias, options: chartBaseOptions });
-        new Chart(document.getElementById('chart-estados'), { type: 'bar', data: datosEstados, options: chartBaseOptions });
-        new Chart(document.getElementById('chart-evolucion'), { type: 'line', data: datosEvolucion, options: lineChartOptions });
-        dashboardChartsInitialized = true;
+    const bulkActions = document.getElementById('bulkActions');
+    const sincronizarModoMasivo = () => {
+        document.body.classList.toggle('bulk-mode', Boolean(bulkActions && bulkActions.open));
     };
+    if (bulkActions) {
+        bulkActions.addEventListener('toggle', sincronizarModoMasivo);
+        sincronizarModoMasivo();
+    }
 
-    const chartsPanel = document.getElementById('dashboardCharts');
-    const toggleChartsButton = document.getElementById('toggleDashboardCharts');
-    if (chartsPanel && toggleChartsButton) {
-        toggleChartsButton.addEventListener('click', () => {
-            const isHidden = chartsPanel.hasAttribute('hidden');
-            if (isHidden) {
-                chartsPanel.removeAttribute('hidden');
-                initDashboardCharts();
-                toggleChartsButton.setAttribute('aria-expanded', 'true');
-                toggleChartsButton.textContent = 'Ocultar graficos';
-            } else {
-                chartsPanel.setAttribute('hidden', '');
-                toggleChartsButton.setAttribute('aria-expanded', 'false');
-                toggleChartsButton.textContent = 'Ver graficos';
-            }
-        });
+    const nuevaIncidencia = document.getElementById('nuevaIncidencia');
+    const abrirNuevaIncidencia = () => {
+        if (nuevaIncidencia) nuevaIncidencia.open = true;
+        document.getElementById('titulo')?.focus();
+    };
+    if (window.location.hash === '#nuevaIncidencia') {
+        requestAnimationFrame(abrirNuevaIncidencia);
     }
 
     document.addEventListener('keydown', (event) => {
         if (event.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
             event.preventDefault();
+            const filtros = document.getElementById('filtros');
+            if (filtros) filtros.open = true;
             document.getElementById('busqueda').focus();
         }
 
         if (event.key.toLowerCase() === 'n' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
             event.preventDefault();
-            document.getElementById('titulo').focus();
+            abrirNuevaIncidencia();
         }
     });
 
@@ -744,6 +642,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const current = document.documentElement.getAttribute('data-theme') || 'light';
         applyTheme(current === 'dark' ? 'light' : 'dark');
     });
+
+    const supportMenuToggle = document.getElementById('supportMenuToggle');
+    const supportSidebar = document.getElementById('supportSidebar');
+    if (supportMenuToggle && supportSidebar) {
+        supportMenuToggle.addEventListener('click', () => {
+            const abierto = document.body.classList.toggle('support-menu-open');
+            supportMenuToggle.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+        });
+    }
+
+    const todas = document.getElementById('seleccionarTodas');
+    const checks = Array.from(document.querySelectorAll('.ticket-check'));
+    const totalSeleccion = document.getElementById('seleccionTotal');
+    const actualizarSeleccion = () => {
+        if (!totalSeleccion) return;
+        const total = checks.filter((check) => check.checked).length;
+        totalSeleccion.textContent = `${total} seleccionada${total === 1 ? '' : 's'}`;
+        if (todas) todas.checked = checks.length > 0 && total === checks.length;
+    };
+    if (todas) {
+        todas.addEventListener('change', () => {
+            checks.forEach((check) => { check.checked = todas.checked; });
+            actualizarSeleccion();
+        });
+        checks.forEach((check) => check.addEventListener('change', actualizarSeleccion));
+    }
 
     let draggedCard = null;
     let sourceColumn = null;
@@ -781,19 +705,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function actualizarEstadoVisual(card, estado) {
-        card.classList.remove('abierta', 'en_curso', 'cerrada');
+        card.classList.remove('abierta', 'en_curso', 'resuelta', 'cerrada');
         card.classList.add(estado);
-
-        const botonEstado = card.querySelector('.js-change-state');
-        if (botonEstado) {
-            const nuevoDestino = estado === 'cerrada' ? 'en_curso' : 'cerrada';
-            botonEstado.dataset.targetState = nuevoDestino;
-            botonEstado.textContent = estado === 'cerrada' ? 'Reabrir' : 'Cerrar';
-        }
     }
 
     document.querySelectorAll('.kanban-card').forEach(attachCardListeners);
-    document.querySelectorAll('.kanban-controls select, .kanban-foot a').forEach((el) => {
+    document.querySelectorAll('.kanban-card select, .kanban-foot a').forEach((el) => {
         el.addEventListener('mousedown', (event) => event.stopPropagation());
         el.addEventListener('dragstart', (event) => event.stopPropagation());
     });
@@ -915,6 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.querySelectorAll('.kanban-asignado-form .kanban-select-asignado').forEach((select) => {
+        select.dataset.guardado = select.value;
         select.addEventListener('change', async () => {
             const form = select.closest('.kanban-asignado-form');
             const card = select.closest('.kanban-card');
@@ -923,6 +841,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const aviso = card?.querySelector('.assignment-status');
+            if (aviso) aviso.textContent = 'Guardando...';
             select.disabled = true;
             try {
                 const payload = new URLSearchParams({
@@ -947,6 +867,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(result.error || 'No se pudo asignar');
                 }
 
+                select.dataset.guardado = select.value;
+                if (aviso) aviso.textContent = 'Asignacion guardada';
                 const avatar = card ? card.querySelector('.kanban-avatar') : null;
                 if (avatar) {
                     if (select.value === '') {
@@ -955,11 +877,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         avatar.title = 'Sin asignar';
                     } else {
                         avatar.classList.remove('is-empty');
-                        avatar.textContent = inicialesDe(select.value);
-                        avatar.title = select.value;
+                        const nombreSeleccionado = select.options[select.selectedIndex]?.textContent.trim() || '';
+                        avatar.textContent = inicialesDe(nombreSeleccionado);
+                        avatar.title = nombreSeleccionado;
                     }
                 }
             } catch (error) {
+                select.value = select.dataset.guardado || '';
+                if (aviso) aviso.textContent = 'No se guardo. Intentalo de nuevo.';
                 alert('Error al asignar tecnico: ' + error.message);
             } finally {
                 select.disabled = false;

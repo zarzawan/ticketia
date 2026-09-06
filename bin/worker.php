@@ -21,6 +21,8 @@ $opciones = getopt('', ['lote::', 'bucle', 'reintentar-fallidos']);
 $lote = max(1, (int)($opciones['lote'] ?? 10));
 $bucle = array_key_exists('bucle', $opciones);
 
+$ultimo_mantenimiento = 0;
+
 if (array_key_exists('reintentar-fallidos', $opciones)) {
     $n = trabajos_reintentar_fallidos($pdo);
     echo "[worker] $n trabajos fallidos reencolados\n";
@@ -29,8 +31,33 @@ if (array_key_exists('reintentar-fallidos', $opciones)) {
     }
 }
 
+$ultimo_latido = 0;
+$registrar_latido = static function (bool $forzar = false) use ($pdo, $bucle, &$ultimo_latido): void {
+    if ($forzar || time() - $ultimo_latido >= 15) {
+        trabajos_worker_latido($pdo, $bucle ? 'bucle' : 'puntual');
+        $ultimo_latido = time();
+    }
+};
+
 do {
-    $resumen = trabajos_procesar_lote($pdo, $lote);
+    $registrar_latido();
+    // En modo puntual se ejecuta una vez; en modo servicio, cada hora.
+    if (time() - $ultimo_mantenimiento >= 3600) {
+        $mantenimiento = incidencias_ejecutar_mantenimiento($pdo);
+        $tokens_limpiados = cuenta_seguridad_mantenimiento($pdo);
+        $logs_ia_limpiados = gobierno_ia_mantenimiento($pdo);
+        $ultimo_mantenimiento = time();
+        if ($mantenimiento['cerradas'] > 0 || $mantenimiento['archivadas'] > 0 || $tokens_limpiados > 0 || $logs_ia_limpiados > 0) {
+            echo sprintf(
+                "[mantenimiento] cerradas=%d archivadas=%d tokens_acceso=%d logs_ia=%d\n",
+                $mantenimiento['cerradas'],
+                $mantenimiento['archivadas'],
+                $tokens_limpiados,
+                $logs_ia_limpiados
+            );
+        }
+    }
+    $resumen = trabajos_procesar_lote($pdo, $lote, $registrar_latido);
     if ($resumen['procesados'] > 0) {
         echo sprintf(
             "[worker] %s procesados=%d completados=%d reintentos=%d fallidos=%d\n",
@@ -46,4 +73,5 @@ do {
     }
 } while ($bucle);
 
+$registrar_latido(true);
 exit(0);

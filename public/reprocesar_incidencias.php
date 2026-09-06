@@ -15,6 +15,7 @@ $errores = 0;
 
 foreach ($incidencias as $incidencia) {
     $id = (int)$incidencia['id'];
+    gobierno_ia_contexto_establecer($id);
 
     $clasificacion = clasificar_incidencia((string)$incidencia['titulo'], (string)$incidencia['descripcion']);
     if ($clasificacion === null) {

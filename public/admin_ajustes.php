@@ -22,9 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($accion === 'purgar_logs') {
-        $borrados = $pdo->exec("DELETE FROM llm_logs WHERE fecha < NOW() - INTERVAL 30 DAY");
+        $borrados = gobierno_ia_mantenimiento($pdo);
         auditar($pdo, 'purgar_logs_ia', "$borrados registros");
-        $aviso = "Eliminados $borrados registros de actividad IA anteriores a 30 dias.";
+        $aviso = "Eliminados $borrados registros de actividad IA segun la retencion de " . gobierno_ia_retencion_dias() . ' dias.';
     }
 
     if ($accion === 'procesar_cola') {
@@ -37,6 +37,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $n = trabajos_reintentar_fallidos($pdo);
         auditar($pdo, 'reintentar_trabajos_ia', "$n trabajos");
         $aviso = "$n trabajos fallidos reencolados.";
+    }
+
+    if ($accion === 'guardar_sla') {
+        $nivel = (string)($_POST['nivel_cliente'] ?? '');
+        $tipo = trim((string)($_POST['tipo_incidencia'] ?? '*'));
+        $urgencia = (string)($_POST['urgencia'] ?? '');
+        $respuesta = filter_input(INPUT_POST, 'primera_respuesta_horas', FILTER_VALIDATE_INT);
+        $resolucion = filter_input(INPUT_POST, 'resolucion_horas', FILTER_VALIDATE_INT);
+        $tipos_validos = array_merge(['*'], dominio_tipos());
+
+        if (!isset(dominio_niveles_servicio()[$nivel]) || !in_array($tipo, $tipos_validos, true) || !in_array($urgencia, dominio_urgencias(), true)) {
+            $error = 'La combinacion de nivel, tipo y urgencia no es valida.';
+        } elseif ($respuesta === false || $resolucion === false || $respuesta < 1 || $resolucion < $respuesta || $resolucion > 8760) {
+            $error = 'Las horas deben ser positivas y la resolucion no puede ser menor que la primera respuesta.';
+        } else {
+            $pdo->prepare(
+                "INSERT INTO sla_politicas (nivel_cliente, tipo_incidencia, urgencia, primera_respuesta_horas, resolucion_horas, activo)
+                 VALUES (:nivel, :tipo, :urgencia, :respuesta, :resolucion, 1)
+                 ON DUPLICATE KEY UPDATE primera_respuesta_horas = VALUES(primera_respuesta_horas),
+                    resolucion_horas = VALUES(resolucion_horas), activo = 1"
+            )->execute([
+                ':nivel' => $nivel,
+                ':tipo' => $tipo,
+                ':urgencia' => $urgencia,
+                ':respuesta' => $respuesta,
+                ':resolucion' => $resolucion,
+            ]);
+            dominio_sla_cargar_politicas($pdo);
+            auditar($pdo, 'guardar_sla', "$nivel / $tipo / $urgencia: {$respuesta}h / {$resolucion}h");
+            $aviso = 'Politica SLA guardada.';
+        }
+    }
+
+    if ($accion === 'eliminar_sla') {
+        $id_sla = filter_input(INPUT_POST, 'id_sla', FILTER_VALIDATE_INT);
+        if ($id_sla) {
+            $stmt = $pdo->prepare("DELETE FROM sla_politicas WHERE id = :id AND tipo_incidencia <> '*'");
+            $stmt->execute([':id' => $id_sla]);
+            dominio_sla_cargar_politicas($pdo);
+            auditar($pdo, 'eliminar_sla', "politica #$id_sla");
+            $aviso = $stmt->rowCount() > 0 ? 'Excepcion SLA eliminada.' : 'Las politicas generales no se pueden eliminar; puedes editarlas.';
+        }
     }
 }
 
@@ -61,20 +103,28 @@ $contadores = $pdo->query(
 $extensiones = ['pdo_mysql', 'curl', 'mbstring', 'fileinfo', 'openssl'];
 
 $cola = trabajos_estado($pdo);
-$limite_dia = (int)($_ENV['LLM_MAX_LLAMADAS_DIA'] ?? 0);
+$salud_worker = trabajos_worker_salud($pdo);
+$limite_dia = (int)entorno_valor('LLM_MAX_LLAMADAS_DIA', 0);
 $llamadas_pago_hoy = (int)$pdo->query(
     "SELECT COUNT(*) FROM llm_logs WHERE proveedor <> 'local' AND DATE(fecha) = CURDATE()"
 )->fetchColumn();
+$politicas_sla = $pdo->query(
+    "SELECT * FROM sla_politicas
+     ORDER BY FIELD(nivel_cliente, 'estandar', 'preferente', 'premium'),
+              (tipo_incidencia = '*') DESC, tipo_incidencia,
+              FIELD(urgencia, 'critico', 'urgente', 'leve')"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del sistema.', 'admin_ajustes.php');
+ui_admin_cabecera('Configuracion', 'Define como trabaja tu servicio: IA, compromisos y mantenimiento.', 'admin_ajustes.php');
 ?>
 
 <?php if ($aviso !== ''): ?><div class="success-message"><?= ui_e($aviso) ?></div><?php endif; ?>
 <?php if ($error !== ''): ?><div class="login-error"><?= ui_e($error) ?></div><?php endif; ?>
 
+<nav class="service-subnav" aria-label="Secciones de configuracion"><a href="#configIA">Inteligencia artificial</a><a href="#configSLA">Compromisos SLA</a><a href="#configSistema">Sistema</a><a href="#configMantenimiento">Mantenimiento</a></nav>
 <div class="split-2">
     <div class="incidencia-box compact-box">
-        <h2>Inteligencia artificial</h2>
+        <h2 id="configIA">Inteligencia artificial</h2>
         <div class="detail-list">
             <div class="detail-row">
                 <span>Proveedor activo</span>
@@ -113,6 +163,7 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
         <p class="help-line">Los endpoints y claves se configuran en el fichero .env; los cambios de proveedor hechos aqui se guardan en la base de datos.</p>
 
         <h2 style="margin-top:18px;">Cola de trabajos IA</h2>
+        <?= ui_worker_estado($salud_worker) ?>
         <div class="detail-list">
             <div class="detail-row"><span>Pendientes</span><strong><?= (int)($cola['pendiente'] ?? 0) ?></strong></div>
             <div class="detail-row"><span>En curso</span><strong><?= (int)($cola['en_curso'] ?? 0) ?></strong></div>
@@ -138,10 +189,11 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
             <?php endif; ?>
         </div>
         <p class="help-line">Para procesado automatico programa <code>php bin/worker.php</code> (cron o Programador de tareas), o dejalo en bucle con <code>--bucle</code>.</p>
+        <p class="help-line">Alerta tras <?= trabajos_worker_umbral() ?> segundos sin senal. Configura <code>WORKER_ALERTA_SEGUNDOS</code> por encima del intervalo programado y la duracion maxima de una tarea. Procesar manualmente no confirma que la automatizacion funcione.</p>
     </div>
 
     <div class="incidencia-box compact-box">
-        <h2>Sistema</h2>
+        <h2 id="configSistema">Sistema</h2>
         <div class="detail-list">
             <div class="detail-row"><span>Version de PHP</span><strong><?= ui_e(PHP_VERSION) ?></strong></div>
             <div class="detail-row"><span>Base de datos</span><strong><?= ui_e((string)$version_bd) ?></strong></div>
@@ -155,6 +207,12 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
                 </strong>
             </div>
             <div class="detail-row"><span>Hash de contrasenas</span><strong><?= defined('PASSWORD_ARGON2ID') ? 'Argon2id' : 'bcrypt' ?></strong></div>
+            <div class="detail-row">
+                <span>Clave de aplicacion</span>
+                <strong class="<?= cuenta_app_key_disponible() ? '' : 'texto-alerta' ?>">
+                    <?= cuenta_app_key_disponible() ? 'Configurada · 2FA disponible' : 'Pendiente · 2FA desactivado' ?>
+                </strong>
+            </div>
             <div class="detail-row"><span>Incidencias</span><strong><?= (int)$contadores['incidencias'] ?></strong></div>
             <div class="detail-row"><span>Mensajes</span><strong><?= (int)$contadores['mensajes'] ?></strong></div>
             <div class="detail-row"><span>Usuarios / Empresas</span><strong><?= (int)$contadores['usuarios'] ?> / <?= (int)$contadores['clientes'] ?></strong></div>
@@ -165,12 +223,77 @@ ui_admin_cabecera('Ajustes', 'Proveedor de IA, mantenimiento e informacion del s
 </div>
 
 <div class="incidencia-box compact-box">
-    <h2>Mantenimiento</h2>
+    <div class="section-head">
+        <div><h2 id="configSLA">Compromisos de servicio (SLA)</h2><p class="help-line">Define cuanto tiempo tiene el equipo para responder y resolver. Los objetivos se miden en horas naturales; las excepciones por tipo prevalecen sobre la regla general.</p></div>
+    </div>
+    <form method="POST" class="filter-form-modern">
+        <?= csrf_campo() ?>
+        <input type="hidden" name="accion" value="guardar_sla">
+        <div class="filter-field">
+            <label class="filter-label" for="sla_nivel">Nivel de cliente</label>
+            <select id="sla_nivel" name="nivel_cliente" required>
+                <?php foreach (dominio_niveles_servicio() as $clave => $etiqueta): ?>
+                    <option value="<?= ui_e($clave) ?>"><?= ui_e($etiqueta) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sla_tipo">Tipo de incidencia</label>
+            <select id="sla_tipo" name="tipo_incidencia" required>
+                <option value="*">Todos (regla general)</option>
+                <?php foreach (dominio_tipos() as $tipo): ?><option value="<?= ui_e($tipo) ?>"><?= ui_e($tipo) ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sla_urgencia">Urgencia</label>
+            <select id="sla_urgencia" name="urgencia" required>
+                <?php foreach (dominio_urgencias() as $urgencia): ?><option value="<?= ui_e($urgencia) ?>"><?= ui_e(ui_urgencia_label($urgencia)) ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sla_respuesta">Primera respuesta (h)</label>
+            <input id="sla_respuesta" name="primera_respuesta_horas" type="number" min="1" max="8760" value="4" required>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sla_resolucion">Resolucion (h)</label>
+            <input id="sla_resolucion" name="resolucion_horas" type="number" min="1" max="8760" value="16" required>
+        </div>
+        <div class="filter-actions-inline"><button type="submit" class="filter-button">Guardar politica</button></div>
+    </form>
+
+    <div class="ticket-table-wrap" style="margin-top:16px;">
+        <table class="logs-table">
+            <thead><tr><th>Nivel</th><th>Tipo</th><th>Urgencia</th><th>Primera respuesta</th><th>Resolucion</th><th>Acciones</th></tr></thead>
+            <tbody>
+                <?php foreach ($politicas_sla as $politica): ?>
+                    <tr>
+                        <td><?= ui_e(dominio_niveles_servicio()[$politica['nivel_cliente']] ?? $politica['nivel_cliente']) ?></td>
+                        <td><?= $politica['tipo_incidencia'] === '*' ? 'Todos' : ui_e($politica['tipo_incidencia']) ?></td>
+                        <td><?= ui_e(ui_urgencia_label($politica['urgencia'])) ?></td>
+                        <td><?= (int)$politica['primera_respuesta_horas'] ?> h</td>
+                        <td><?= (int)$politica['resolucion_horas'] ?> h</td>
+                        <td>
+                            <?php if ($politica['tipo_incidencia'] !== '*'): ?>
+                                <form method="POST" onsubmit="return confirm('Eliminar esta excepcion SLA?');">
+                                    <?= csrf_campo() ?><input type="hidden" name="accion" value="eliminar_sla"><input type="hidden" name="id_sla" value="<?= (int)$politica['id'] ?>">
+                                    <button type="submit" class="card-button secondary-button boton-mini">Eliminar</button>
+                                </form>
+                            <?php else: ?><span class="help-line">Base</span><?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="incidencia-box compact-box">
+    <h2 id="configMantenimiento">Mantenimiento</h2>
     <div class="page-tools">
-        <form method="POST" onsubmit="return confirm('Eliminar los registros de actividad IA de mas de 30 dias?');">
+        <form method="POST" onsubmit="return confirm('Eliminar un lote de registros que superan la retencion configurada?');">
             <?= csrf_campo() ?>
             <input type="hidden" name="accion" value="purgar_logs">
-            <button type="submit" class="card-button secondary-button">Purgar actividad IA (+30 dias)</button>
+            <button type="submit" class="card-button secondary-button">Purgar actividad IA (+<?= gobierno_ia_retencion_dias() ?> dias)</button>
         </form>
         <a class="card-button secondary-button" href="reprocesar_incidencias.php">Clasificar incidencias pendientes</a>
         <a class="card-button secondary-button" href="reprocesar_incidencias.php?todas=1" onclick="return confirm('Re-clasificar TODAS las incidencias con IA? Puede tardar y consumir tokens.');">Re-clasificar todo el historico</a>

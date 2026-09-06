@@ -7,7 +7,9 @@ final class DominioTest extends TestCase
     public function testCatalogosBasicos(): void
     {
         $this->assertSame(['critico', 'urgente', 'leve'], dominio_urgencias());
-        $this->assertSame(['abierta', 'en_curso', 'cerrada'], dominio_estados());
+        $this->assertSame(['abierta', 'en_curso', 'resuelta', 'cerrada'], dominio_estados());
+        $this->assertSame(['abierta', 'en_curso'], dominio_estados_activos());
+        $this->assertSame('Solucion permanente', dominio_codigos_resolucion()['solucion_permanente']);
         $this->assertContains('id_desc', dominio_ordenes());
         $this->assertNotEmpty(dominio_tipos());
     }
@@ -74,5 +76,82 @@ final class DominioTest extends TestCase
         $this->assertStringContainsString(':desde', $sql);
         $this->assertStringContainsString(':hasta', $sql);
         $this->assertSame('%vpn%', $params[':busqueda']);
+    }
+
+    public function testSlaCriticoDetectaRiesgoYVencimiento(): void
+    {
+        $ticket = [
+            'fecha_creacion' => '2026-07-12 10:00:00',
+            'urgencia' => 'critico',
+            'estado' => 'abierta',
+            'primera_respuesta' => '2026-07-12 10:30:00',
+        ];
+        $riesgo = dominio_sla_calcular($ticket, new DateTimeImmutable('2026-07-12 13:00:00'));
+        $vencido = dominio_sla_calcular($ticket, new DateTimeImmutable('2026-07-12 15:00:00'));
+
+        $this->assertSame('riesgo', $riesgo['estado']);
+        $this->assertSame('vencido', $vencido['estado']);
+        $this->assertSame(1, $riesgo['objetivo_respuesta_horas']);
+        $this->assertSame(4, $riesgo['objetivo_resolucion_horas']);
+    }
+
+    public function testSlaDetectaPrimeraRespuestaVencida(): void
+    {
+        $sla = dominio_sla_calcular([
+            'fecha_creacion' => '2026-07-12 10:00:00',
+            'urgencia' => 'critico',
+            'estado' => 'abierta',
+        ], new DateTimeImmutable('2026-07-12 11:30:00'));
+
+        $this->assertSame('vencido', $sla['estado']);
+        $this->assertSame('vencido', $sla['estado_respuesta']);
+        $this->assertSame('primera_respuesta', $sla['objetivo_actual']);
+    }
+
+    public function testSlaSeDetieneAlProponerSolucion(): void
+    {
+        $sla = dominio_sla_calcular([
+            'fecha_creacion' => '2026-07-12 10:00:00',
+            'fecha_resolucion' => '2026-07-12 12:00:00',
+            'urgencia' => 'critico',
+            'estado' => 'resuelta',
+            'primera_respuesta' => '2026-07-12 10:30:00',
+        ], new DateTimeImmutable('2026-07-14 12:00:00'));
+
+        $this->assertSame('cumplido', $sla['estado']);
+        $this->assertSame(7200, $sla['restante_segundos']);
+    }
+
+    public function testSiguientePasoYPrioridadOperativaSonExplicables(): void
+    {
+        $this->assertSame('Responder ahora', dominio_siguiente_paso('cliente', 'en_curso')['label']);
+        $this->assertSame('Esperando al cliente', dominio_siguiente_paso('tecnico', 'en_curso')['label']);
+        $this->assertSame('Esperando confirmacion', dominio_siguiente_paso('tecnico', 'resuelta')['label']);
+        $this->assertSame('Finalizada', dominio_siguiente_paso('cliente', 'cerrada')['label']);
+        $puntos = dominio_prioridad_operativa([
+            'fecha_creacion' => '2026-07-12 10:00:00',
+            'urgencia' => 'critico',
+            'estado' => 'abierta',
+            'asignado_id' => null,
+            'ultimo_autor' => 'cliente',
+        ], new DateTimeImmutable('2026-07-12 15:00:00'));
+        $this->assertSame(100, $puntos);
+    }
+
+    public function testSlaPermiteNivelClienteYExcepcionPorTipo(): void
+    {
+        dominio_sla_establecer_politicas([
+            ['nivel_cliente' => 'premium', 'tipo_incidencia' => '*', 'urgencia' => 'urgente', 'primera_respuesta_horas' => 2, 'resolucion_horas' => 8],
+            ['nivel_cliente' => 'premium', 'tipo_incidencia' => 'Seguridad', 'urgencia' => 'urgente', 'primera_respuesta_horas' => 1, 'resolucion_horas' => 4],
+        ]);
+
+        $general = dominio_sla_objetivos('urgente', 'Correo', 'premium');
+        $seguridad = dominio_sla_objetivos('urgente', 'Seguridad', 'premium');
+
+        $this->assertSame(8, $general['resolucion']);
+        $this->assertSame('*', $general['tipo_politica']);
+        $this->assertSame(4, $seguridad['resolucion']);
+        $this->assertSame('Seguridad', $seguridad['tipo_politica']);
+        dominio_sla_establecer_politicas([]);
     }
 }

@@ -78,11 +78,13 @@ function trabajos_resolver(PDO $pdo, array $trabajo, bool $exito, string $error 
  *   - clasificar: {"id_incidencia": N} -> clasificacion IA del ticket
  */
 function trabajos_ejecutar(PDO $pdo, array $trabajo): array {
+    gobierno_ia_contexto_establecer(null);
     $payload = json_decode((string)$trabajo['payload'], true) ?: [];
 
     switch ($trabajo['tipo']) {
         case 'clasificar':
             $id = (int)($payload['id_incidencia'] ?? 0);
+            gobierno_ia_contexto_establecer($id);
             $stmt = $pdo->prepare("SELECT titulo, descripcion FROM incidencias WHERE id = :id");
             $stmt->execute([':id' => $id]);
             $incidencia = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -105,10 +107,11 @@ function trabajos_ejecutar(PDO $pdo, array $trabajo): array {
  * Procesa hasta $lote trabajos pendientes. Devuelve resumen
  * ['procesados' => n, 'completados' => n, 'reintentos' => n, 'fallidos' => n].
  */
-function trabajos_procesar_lote(PDO $pdo, int $lote = 10): array {
+function trabajos_procesar_lote(PDO $pdo, int $lote = 10, ?callable $latido = null): array {
     $resumen = ['procesados' => 0, 'completados' => 0, 'reintentos' => 0, 'fallidos' => 0];
 
     for ($i = 0; $i < $lote; $i++) {
+        if ($latido !== null) $latido();
         $trabajo = trabajos_reclamar($pdo);
         if ($trabajo === null) {
             break;
@@ -122,6 +125,7 @@ function trabajos_procesar_lote(PDO $pdo, int $lote = 10): array {
         }
 
         trabajos_resolver($pdo, $trabajo, $exito, $error);
+        if ($latido !== null) $latido();
         if ($exito) {
             $resumen['completados']++;
         } elseif ((int)$trabajo['intentos'] >= (int)$trabajo['max_intentos']) {
@@ -158,4 +162,46 @@ function trabajos_reintentar_fallidos(PDO $pdo): int {
     );
     $stmt->execute();
     return $stmt->rowCount();
+}
+
+/** Ultima actividad CLI, no inventario de procesos. Una sola clave, sin historial ilimitado. */
+function trabajos_worker_latido(PDO $pdo, string $modo): void {
+    try {
+        $pdo->prepare("INSERT INTO ajustes (clave, valor) VALUES ('worker_ultimo_latido', JSON_OBJECT('fecha', UNIX_TIMESTAMP(), 'modo', :modo))
+            ON DUPLICATE KEY UPDATE valor = VALUES(valor)")->execute([':modo' => $modo === 'bucle' ? 'bucle' : 'puntual']);
+    } catch (PDOException $e) {
+        // La observabilidad no debe bloquear el procesamiento de la cola.
+        error_log('TicketIA: no se pudo registrar la actividad del worker.');
+    }
+}
+
+function trabajos_worker_umbral(): int {
+    return max(60, min(86400, (int)entorno_valor('WORKER_ALERTA_SEGUNDOS', '600')));
+}
+
+/** Un latido reciente no garantiza que el proceso siga vivo ni que los trabajos tengan exito. */
+function trabajos_worker_evaluar(?array $latido, int $ahora, int $umbral): array {
+    $fecha = (int)($latido['fecha'] ?? 0);
+    if ($fecha <= 0 || $fecha > $ahora + 5 || !in_array($latido['modo'] ?? '', ['bucle', 'puntual'], true)) {
+        return ['estado' => 'sin_datos', 'tono' => 'unknown', 'etiqueta' => 'Sin senal registrada',
+            'detalle' => 'Todavia no hay actividad del procesador automatico. Revisa su programacion.', 'fecha' => null];
+    }
+    $edad = max(0, $ahora - $fecha);
+    $reciente = $edad <= $umbral;
+    $detalle = ($latido['modo'] === 'bucle' ? 'Ultima senal del servicio' : 'Ultima ejecucion puntual')
+        . ': hace ' . ($edad < 60 ? $edad . ' s' : (int)floor($edad / 60) . ' min') . '.';
+    if (!$reciente) $detalle .= ' Revisa el servicio, su programacion y los registros.';
+    return ['estado' => $reciente ? 'reciente' : 'sin_senal', 'tono' => $reciente ? 'ok' : 'warn',
+        'etiqueta' => $reciente ? 'Actividad reciente' : 'Sin actividad reciente', 'detalle' => $detalle, 'fecha' => $fecha];
+}
+
+function trabajos_worker_salud(PDO $pdo): array {
+    try {
+        $fila = $pdo->query("SELECT UNIX_TIMESTAMP() AS ahora, (SELECT valor FROM ajustes WHERE clave = 'worker_ultimo_latido') AS latido")->fetch(PDO::FETCH_ASSOC);
+        $latido = json_decode((string)($fila['latido'] ?? ''), true);
+        return trabajos_worker_evaluar(is_array($latido) ? $latido : null, (int)$fila['ahora'], trabajos_worker_umbral());
+    } catch (PDOException $e) {
+        return ['estado' => 'no_disponible', 'tono' => 'warn', 'etiqueta' => 'Estado no disponible',
+            'detalle' => 'No se ha podido consultar la actividad del procesador.', 'fecha' => null];
+    }
 }

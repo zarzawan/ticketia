@@ -11,6 +11,7 @@ if (!$id_incidencia) {
     header('Location: index.php?error=1');
     exit;
 }
+gobierno_ia_contexto_establecer((int)$id_incidencia);
 
 $stmt = $pdo->prepare("SELECT titulo, descripcion FROM incidencias WHERE id = :id");
 $stmt->execute([':id' => $id_incidencia]);

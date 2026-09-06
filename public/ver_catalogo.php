@@ -9,7 +9,7 @@ $filtro_esfuerzo = isset($_GET['filtro_esfuerzo']) ? trim($_GET['filtro_esfuerzo
 // Construir la consulta SQL con filtros dinámicos
 $sql = "SELECT nombre, descripcion, categoria, precio, caracteristicas, esfuerzo 
         FROM catalogo_productos 
-        WHERE 1=1";
+        WHERE activo = 1";
 $params = [];
 
 if ($busqueda) {
@@ -53,7 +53,7 @@ $esfuerzos = array_unique(array_column($productos, 'esfuerzo'));
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📋 Catálogo de Productos</title>
-    <link rel="stylesheet" href="estilos.css">
+    <link rel="stylesheet" href="estilos.css?v=<?= filemtime(__DIR__ . '/estilos.css') ?>">
     <style>
         .catalogo-container {
             max-width: 1200px;

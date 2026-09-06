@@ -5,7 +5,14 @@
 
 define('TICKETIA_RAIZ', dirname(__DIR__));
 
+require TICKETIA_RAIZ . '/src/entorno.php';
+require TICKETIA_RAIZ . '/src/seguridad_cuenta.php';
+require TICKETIA_RAIZ . '/src/auth.php';
+require TICKETIA_RAIZ . '/src/gobierno_ia.php';
+require TICKETIA_RAIZ . '/src/conocimiento.php';
 require TICKETIA_RAIZ . '/src/llm.php';
 require TICKETIA_RAIZ . '/src/dominio.php';
+require TICKETIA_RAIZ . '/src/bandeja.php';
+require TICKETIA_RAIZ . '/src/trabajos.php';
 require TICKETIA_RAIZ . '/src/ui.php';
 require TICKETIA_RAIZ . '/src/adjuntos.php';
