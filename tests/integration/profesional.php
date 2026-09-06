@@ -24,6 +24,11 @@ function probar_profesional(PDO $pdo, string $admin, string $cliente, string $ag
     comprobar($pdo->query("SELECT estado FROM incidencias WHERE id=$id")->fetchColumn()==='resuelta','Respuesta no sobrescribe resolucion concurrente');
     comprobar((int)$pdo->query("SELECT COUNT(*) FROM mensajes WHERE id_incidencia=$id")->fetchColumn()===0,'Respuesta concurrente no se inserta');
     $pdo->exec("UPDATE incidencias SET estado='abierta' WHERE id=$id");
+    $huella = soporte_huella($pdo,$id);
+    $pdo->exec("UPDATE incidencias SET asignado_id=5 WHERE id=$id");
+    peticion('guardar_mensaje.php',$admin,['csrf'=>$token,'id_incidencia'=>$id,'mensaje'=>'CONFLICTO_ACTIVO','huella'=>$huella,'solicitud_id'=>str_repeat('c',32)]);
+    comprobar((int)$pdo->query("SELECT COUNT(*) FROM mensajes WHERE id_incidencia=$id")->fetchColumn()===0,'Huella rechaza una actualizacion concurrente aunque siga activa');
+    $pdo->exec("UPDATE incidencias SET asignado_id=NULL WHERE id=$id");
     $datos = ['csrf'=>$token,'id_incidencia'=>$id,'mensaje'=>'RESPUESTA_UNICA','solicitud_id'=>str_repeat('b',32)];
     peticion('guardar_mensaje.php',$admin,$datos); peticion('guardar_mensaje.php',$admin,$datos);
     comprobar((int)$pdo->query("SELECT COUNT(*) FROM mensajes WHERE id_incidencia=$id")->fetchColumn()===1,'Respuesta ordinaria idempotente');
@@ -112,6 +117,9 @@ function probar_profesional(PDO $pdo, string $admin, string $cliente, string $ag
         comprobar($sql['sla_estado']===$php['estado'] && (int)$sql['sla_restante']===(int)$php['restante_segundos'],'Calendario consistente: '.$fecha);
     }
     [$codigo] = peticion("index.php?busqueda=$id",$admin); comprobar($codigo===200,'Bandeja HTTP con calendario activo');
+    $inicioCalendario = microtime(true);
+    [$codigo] = peticion('index.php?vista=kanban',$admin); comprobar($codigo===200,'Bandeja completa con calendario laboral y volumen');
+    echo 'Calendario laboral: bandeja completa en ' . round(microtime(true)-$inicioCalendario,2) . " s.\n";
     $pdo->exec("DELETE FROM ajustes WHERE clave='calendario_servicio'"); calendario_cargar($pdo);
     $pdo->beginTransaction();
     $stmt = $pdo->prepare("INSERT INTO mensajes (id_incidencia,autor,mensaje,interno) VALUES (?,'cliente',?,0)");
