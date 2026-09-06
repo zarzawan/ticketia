@@ -2,7 +2,10 @@
 require_once __DIR__ . '/../src/arranque.php';
 auth_requerir_rol('admin');
 ui_admin_cabecera('Equipos y reparto', 'Reglas explicables. Ninguna se activa sin una simulacion previa.', 'admin_reglas.php');
-if (!reglas_disponibles($pdo)) { echo '<p>Aplica la migracion de equipos y reglas para utilizar esta pantalla.</p>'; ui_admin_pie(); exit; }
+if (!reglas_disponibles($pdo)) {
+    echo '<section class="admin-panel"><h2>Prepara tu equipo de soporte</h2><p>Esta instalacion necesita la migracion 14 de equipos y reparto. No se ha creado ni modificado ningun equipo.</p><ol><li>Realiza una copia de la base de datos.</li><li>Aplica las migraciones pendientes con <code>php vendor/bin/phinx migrate -c phinx.php</code> desde la carpeta del proyecto.</li><li>Vuelve aqui para crear un equipo, simular una regla y activarla cuando la hayas revisado.</li></ol><p><a href="admin_operacion.php">Comprobar estado de la instalacion</a> · <a href="admin_usuarios.php">Revisar tecnicos disponibles</a></p></section>';
+    ui_admin_pie(); exit;
+}
 $aviso = ''; $error = ''; $simulacion = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -58,11 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $equipos = $pdo->query('SELECT * FROM equipos_soporte ORDER BY nombre LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
-$reglas = $pdo->query('SELECT r.*, e.nombre AS equipo FROM reglas_asignacion r JOIN equipos_soporte e ON e.id=r.equipo_id ORDER BY prioridad,id LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
+$reglas = $pdo->query('SELECT r.*, e.nombre AS equipo FROM reglas_asignacion r JOIN equipos_soporte e ON e.id=r.equipo_id ORDER BY r.prioridad,r.id LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
 $editar = (int)($_GET['equipo'] ?? 0);
 $equipoEditar = null; foreach ($equipos as $equipo) if ((int)$equipo['id'] === $editar) $equipoEditar = $equipo;
 $stmt = $pdo->prepare('SELECT usuario_id FROM equipos_miembros WHERE equipo_id=?'); $stmt->execute([$editar]); $miembros = $stmt->fetchAll(PDO::FETCH_COLUMN);
 ?>
+<section class="admin-panel"><h2><?= !$equipos ? 'Empieza creando tu primer equipo' : 'Reparto del trabajo' ?></h2><p>1. Agrupa a los tecnicos. 2. Indica que incidencias recibira cada equipo. 3. Simula y activa la regla. La asignacion manual siempre se respeta.</p><p><?= count($equipos) ?> equipos · <?= count($reglas) ?> reglas · <?= count(array_filter($reglas,static fn(array $r):bool=>(bool)$r['activo'])) ?> activas</p><?php if (!$equipos): ?><p>Todavia no hay equipos. Abre «Crear equipo», ponle un nombre y selecciona al menos un tecnico. <a href="admin_usuarios.php">Gestionar tecnicos</a>.</p><?php elseif (!$reglas): ?><p>El equipo esta preparado. Crea una primera regla y comprueba su resultado con «Simular» antes de activarla.</p><?php endif; ?></section>
+<section class="admin-panel" data-ia-operativa="reparto" data-csrf="<?= ui_e(csrf_token()) ?>"><h2>Ayuda de IA para organizar el soporte</h2><p>La IA consulta volumen agregado por departamento y cantidad de tecnicos, equipos y reglas; no recibe nombres ni conversaciones. Propone una organizacion para revisar, no crea ni activa reglas.</p><button type="button" class="card-button secondary-button" data-generar>Proponer organizacion con IA</button><p class="reusable-preview" data-salida role="status">La propuesta aparecera aqui. Tu decides como repartir el trabajo.</p></section>
+<script src="ia_operativa.js?v=<?= filemtime(__DIR__ . '/ia_operativa.js') ?>" defer></script>
 <?php if ($aviso): ?><p class="success-message"><?= ui_e($aviso) ?></p><?php endif; ?>
 <?php if ($error): ?><p class="login-error" role="alert"><?= ui_e($error) ?></p><?php endif; ?>
 <?php if ($simulacion): ?><section class="admin-panel"><h2>Simulacion sin cambios</h2><p>Esta regla aislada coincide con <?= count($simulacion['tickets']) > 20 ? 'mas de 20' : count($simulacion['tickets']) ?> incidencias sin asignar. Tecnico con menor carga ahora: <?= $simulacion['tecnico'] ? '#' . (int)$simulacion['tecnico'] : 'ninguno disponible' ?>.</p><p>En ejecucion se respeta primero la prioridad de las reglas activas y se recalcula la carga. Esta muestra no reasigna incidencias.</p><?php foreach (array_slice($simulacion['tickets'],0,20) as $ticket): ?><p><a href="ver_incidencia.php?id=<?= (int)$ticket['id'] ?>">#<?= (int)$ticket['id'] ?> <?= ui_e($ticket['titulo']) ?></a></p><?php endforeach; ?></section><?php endif; ?>

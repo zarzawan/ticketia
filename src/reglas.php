@@ -1,7 +1,12 @@
 <?php
 
 function reglas_disponibles(PDO $pdo): bool {
-    try { $pdo->query('SELECT id FROM reglas_asignacion LIMIT 0'); return true; }
+    try {
+        $pdo->query('SELECT id,nombre,equipo_id,cliente_id,tipo,prioridad,activo FROM reglas_asignacion LIMIT 0');
+        $pdo->query('SELECT id,nombre FROM equipos_soporte LIMIT 0');
+        $pdo->query('SELECT equipo_id,usuario_id FROM equipos_miembros LIMIT 0');
+        return true;
+    }
     catch (PDOException $e) { return false; }
 }
 

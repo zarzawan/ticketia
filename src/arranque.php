@@ -63,7 +63,7 @@ if (PHP_SAPI !== 'cli') {
         if (in_array($pagina_actual, $paginas_admin, true)) {
             auth_requerir_rol('admin');
         }
-        if (in_array($pagina_actual, ['admin_operacion.php','admin_reglas.php','admin_calendario.php'], true)) auth_requerir_rol('admin');
+        if (in_array($pagina_actual, ['admin_operacion.php','admin_reglas.php','admin_calendario.php','admin_predicciones.php','admin_ia_operativa.php'], true)) auth_requerir_rol('admin');
 
         // El rol cliente solo accede a su portal y a los endpoints que este
         // usa; cualquier otra pagina lo devuelve al portal. La comprobacion

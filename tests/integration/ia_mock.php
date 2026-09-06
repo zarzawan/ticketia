@@ -9,5 +9,8 @@ if (!empty($entrada['stream'])) {
     exit;
 }
 header('Content-Type: application/json');
-$contenido = json_encode(['titulo'=>'Recuperar el acceso al correo', 'resumen'=>'Pasos revisados para recuperar el acceso.', 'contenido'=>"1. Abre los ajustes.\n2. Comprueba tu cuenta.\n3. Contacta con soporte si continua el error.", 'riesgo'=>'bajo', 'sentimiento'=>'neutral', 'siguiente_accion'=>'Revisar configuracion.', 'respuesta_sugerida'=>'Vamos a revisar tu configuracion.', 'confianza'=>80]);
+if (str_contains(json_encode($entrada),'IA_FALLO_PRUEBA')) {
+    echo json_encode(['choices'=>[['message'=>['content'=>'Respuesta no estructurada de prueba']]]]); exit;
+}
+$contenido = json_encode(['titulo'=>'Recuperar el acceso al correo', 'resumen'=>'Pasos revisados para recuperar el acceso.', 'contenido'=>"1. Abre los ajustes.\n2. Comprueba tu cuenta.\n3. Contacta con soporte si continua el error.", 'riesgo'=>'bajo', 'sentimiento'=>'neutral', 'siguiente_accion'=>'Revisar configuracion.', 'limitaciones'=>'Propuesta sintetica sin predicciones validadas.', 'respuesta_sugerida'=>'Vamos a revisar tu configuracion.', 'confianza'=>80]);
 echo json_encode(['choices'=>[['message'=>['content'=>$contenido]]], 'usage'=>['prompt_tokens'=>20,'completion_tokens'=>40]]);

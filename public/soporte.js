@@ -48,14 +48,6 @@ function iniciarBorradoresSoporte() {
             boton.textContent = 'Reintentar envio';
         }
     });
-    document.getElementById('respuestaRapida')?.addEventListener('change', e => {
-        if (!e.target.value) return;
-        if (texto.value.trim() && !confirm('Sustituir el texto actual por la respuesta reutilizable?')) { e.target.value = ''; return; }
-        texto.value = e.target.value;
-        texto.dispatchEvent(new Event('input', {bubbles: true}));
-        e.target.value = '';
-        texto.focus();
-    });
     // Solo informa; no reemplaza texto ni acepta silenciosamente cambios concurrentes.
     setInterval(async () => {
         if (document.hidden) return;

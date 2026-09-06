@@ -1,5 +1,22 @@
 # Changelog
 
+## Proximamente — v2.1 en desarrollo
+
+- IA bajo demanda en predicciones, redaccion de respuestas compartidas y
+  organizacion del reparto. Validacion estructurada, cache privada y propuestas
+  revisables, sin cambios automaticos ni modificaciones del streaming.
+- Equipos y reparto con guia de inicio y deteccion de esquema incompleto.
+
+- Predicciones para administracion: historico por organizacion, graficos de
+  actividad y estados, calidad percibida, cobertura y senales explicables de
+  riesgo y oportunidad. Son reglas orientativas, no probabilidades entrenadas.
+- Colas con contadores, cambio de cola sin arrastrar responsable/estado y entrada
+  al Kanban sin restaurar filtros compartidos entre cuentas del navegador.
+- Biblioteca de cinco respuestas reutilizables con vista previa, insercion sin
+  borrar el borrador, edicion por administradores, desactivacion y control de
+  concurrencia. La migracion 17 habilita persistir las ediciones; las bases se
+  pueden consultar y usar sin ella.
+
 ## [2.0.0] - 2026-09-07
 
 ### Operacion profesional

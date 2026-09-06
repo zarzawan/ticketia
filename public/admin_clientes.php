@@ -120,7 +120,7 @@ ui_admin_cabecera('Organizaciones', 'Empresas, contactos y nivel de servicio en 
             <tbody>
                 <?php foreach ($clientes as $c): ?>
                     <tr class="<?= (int)$c['activo'] === 0 ? 'fila-apagada' : '' ?>">
-                        <td><strong><?= ui_e($c['nombre']) ?></strong></td>
+                        <td><a href="admin_predicciones.php?cliente=<?= (int)$c['id'] ?>"><strong><?= ui_e($c['nombre']) ?></strong></a><small class="queue-context"> · Historico y predicciones</small></td>
                         <td><?= ui_e($c['email_contacto'] ?? '-') ?></td>
                         <td><?= ui_e(dominio_niveles_servicio()[$c['nivel_servicio'] ?? 'estandar'] ?? 'Estandar') ?></td>
                         <td><?= (int)$c['usuarios'] ?></td>
