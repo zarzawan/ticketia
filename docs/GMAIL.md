@@ -48,9 +48,12 @@ el estado de la aplicacion OAuth. Revisa esos requisitos con el administrador.
 - Al aprobar se crea una incidencia y se encola la clasificacion IA en la misma
   transaccion. El worker habitual debe estar ejecutandose. No se llama a IA antes
   de aprobar ni se envian confirmaciones de recepcion automaticamente.
-- Hilos ya importados se bloquean para no crear incidencias duplicadas. Esta
-  primera entrega no agrega respuestas al hilo: deben revisarse en Gmail y la
-  incidencia existente. Tampoco crea cuentas para remitentes desconocidos.
+- Los hilos ya importados muestran su incidencia antes de aprobar: la respuesta
+  se incorpora como comentario publico solo si el remitente pertenece al mismo
+  cliente. Esperando al cliente pasa a En trabajo, sin reclasificar con IA.
+  Incidencias resueltas o cerradas requieren revisar su reapertura por separado.
+  Si cambia el destino durante la revision se exige abrir la entrada de nuevo.
+  No se crean cuentas para remitentes desconocidos ni se enlaza por el asunto.
 - Tokens caducados/revocados requieren reautorizar Google. Un cursor que Google
   invalide requiere reiniciar la sincronizacion bajo supervision; no se borran
   entradas ni se ocultan errores silenciosamente.

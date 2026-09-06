@@ -24,11 +24,14 @@ function soporte_espera_disponible(PDO $pdo): bool {
     return str_contains((string)($columna['Type'] ?? ''), "'esperando_cliente'");
 }
 
+// Si existe una transaccion, el llamador debe confirmar o revertir el conjunto.
+// En ese caso las excepciones se propagan para evitar escrituras parciales.
 function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, bool $interno, string $solicitud, string $huella = '', bool $esperar = false): string {
     $moderno = soporte_esquema_disponible($pdo);
     if ($esperar && ($interno || !in_array($usuario['rol'], ['admin','operador'], true) || !soporte_espera_disponible($pdo))) return 'conflicto';
     if ($mensaje === '' || mb_strlen($mensaje) > 30000 || !preg_match('/^[a-f0-9]{32}$/D', $solicitud)) return 'conflicto';
-    $pdo->beginTransaction();
+    $propia = !$pdo->inTransaction();
+    if ($propia) $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('SELECT estado FROM incidencias WHERE id = :id FOR UPDATE');
         $stmt->execute([':id' => $id]);
@@ -38,18 +41,18 @@ function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, b
             $stmt->execute([':usuario' => $usuario['id'], ':solicitud' => $solicitud]);
             $previo = $stmt->fetchColumn();
             if ($previo !== false) {
-                $pdo->rollBack();
+                if ($propia) $pdo->rollBack();
                 return (int)$previo === $id ? 'duplicado' : 'conflicto';
             }
         }
         if (!in_array($estado, dominio_estados_activos(), true)
             || ($huella !== '' && !hash_equals(soporte_huella($pdo, $id), $huella))) {
-            $pdo->rollBack();
+            if ($propia) $pdo->rollBack();
             return 'conflicto';
         }
         $autor = $usuario['rol'] === 'cliente' ? 'cliente' : 'tecnico';
         if ($autor === 'cliente' && ($interno || !incidencia_visible_para_cliente($pdo, $id, $usuario))) {
-            $pdo->rollBack();
+            if ($propia) $pdo->rollBack();
             return 'conflicto';
         }
         $sql = 'INSERT INTO mensajes (id_incidencia, usuario_id, autor, mensaje, interno' . ($moderno ? ', solicitud_id' : '')
@@ -63,9 +66,10 @@ function soporte_responder(PDO $pdo, int $id, array $usuario, string $mensaje, b
             $pdo->prepare("INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo)
                 VALUES (:id, :usuario, :anterior, :nuevo)")->execute([':id' => $id, ':usuario' => $usuario['id'], ':anterior'=>$estado, ':nuevo'=>$nuevo]);
         }
-        $pdo->commit();
+        if ($propia) $pdo->commit();
         return 'ok';
     } catch (Throwable $e) {
+        if (!$propia) throw $e;
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('TicketIA: no se pudo guardar la respuesta.');
         return 'conflicto';

@@ -78,10 +78,13 @@ Consulta [GMAIL.md](GMAIL.md). Incluye conector de solo lectura, revision de
 identidad y creacion supervisada con clasificacion IA. Requiere migracion 19 y
 consentimiento OAuth del propietario para conectarse realmente.
 
+Las respuestas de hilos importados se incorporan con confirmacion explicita de
+destino, validacion del cliente y escritura atomica del comentario y estado.
+No se reabren incidencias resueltas o cerradas ni se reclasifican con IA.
+
 ## Pendiente
 
-- Agregar respuestas de Gmail a conversaciones existentes; esta version bloquea
-  la creacion de otra incidencia cuando el hilo ya se importo.
+- Conectar y verificar el buzon real tras el consentimiento OAuth del propietario.
 - Registrar resultados comerciales confirmados para evaluar las alertas con
   el tiempo y, solo con suficiente muestra, validar modelos predictivos.
 

@@ -82,7 +82,15 @@ function gmail_sincronizar(PDO $pdo, string $buzon, string $etiqueta, callable $
 }
 
 /** La revision confirma identidad; no se crean cuentas desde cabeceras de correo. */
-function gmail_importar(PDO $pdo, int $entrada, int $revisor): int {
+function gmail_destino(PDO $pdo, array $correo): int {
+    $stmt=$pdo->prepare("SELECT DISTINCT incidencia_id FROM gmail_entradas WHERE buzon=? AND hilo_id=? AND estado='importado' LIMIT 2");
+    $stmt->execute([$correo['buzon'],$correo['hilo_id']]);$ids=$stmt->fetchAll(PDO::FETCH_COLUMN);
+    if(count($ids)>1) throw new RuntimeException('Hilo ambiguo: revisa las incidencias asociadas antes de continuar.');
+    return (int)($ids[0] ?? 0);
+}
+
+function gmail_importar(PDO $pdo, int $entrada, int $revisor, int $destinoEsperado = 0): int {
+    require_once __DIR__ . '/soporte.php';
     $candado = null;
     $pdo->beginTransaction();
     try {
@@ -91,15 +99,22 @@ function gmail_importar(PDO $pdo, int $entrada, int $revisor): int {
         $candado = 'gmailhilo:' . substr(hash('sha256',$correo['buzon'] . ':' . $correo['hilo_id']),0,48);
         $stmt=$pdo->prepare('SELECT GET_LOCK(?,5)');$stmt->execute([$candado]);
         if((int)$stmt->fetchColumn()!==1){$candado=null;throw new RuntimeException('Otra revision de este hilo esta en curso. Intentalo de nuevo.');}
-        $stmt=$pdo->prepare("SELECT u.id,u.cliente_id FROM usuarios u JOIN clientes c ON c.id=u.cliente_id
+        $stmt=$pdo->prepare("SELECT u.id,u.cliente_id,u.rol FROM usuarios u JOIN clientes c ON c.id=u.cliente_id
             WHERE u.email=? AND u.rol='cliente' AND u.activo=1 AND c.activo=1 FOR UPDATE");$stmt->execute([$correo['remitente']]);$usuario=$stmt->fetch(PDO::FETCH_ASSOC);
         if (!$usuario) throw new RuntimeException('El remitente debe corresponder a un cliente activo con organizacion activa. Verifica su identidad antes de registrarlo.');
-        // Se detiene ante un hilo ya importado para no fragmentar una conversacion.
-        $stmt=$pdo->prepare("SELECT incidencia_id FROM gmail_entradas WHERE buzon=? AND hilo_id=? AND estado='importado' LIMIT 1");$stmt->execute([$correo['buzon'],$correo['hilo_id']]);
-        if ($stmt->fetchColumn()) throw new RuntimeException('Este hilo ya tiene una incidencia. Revisa el hilo existente; esta version no anade respuestas de correo automaticamente.');
+        $id=gmail_destino($pdo,$correo);
+        if ($id!==$destinoEsperado) throw new RuntimeException('El destino del hilo ha cambiado. Abre de nuevo la entrada y confirma la incidencia.');
+        if ($id) {
+            $stmt=$pdo->prepare('SELECT cliente_id,estado FROM incidencias WHERE id=? FOR UPDATE');$stmt->execute([$id]);$incidencia=$stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$incidencia || (int)$incidencia['cliente_id']!==(int)$usuario['cliente_id']) throw new RuntimeException('El remitente no pertenece al cliente de esta incidencia.');
+            if (!in_array($incidencia['estado'],dominio_estados_activos(),true)) throw new RuntimeException('La incidencia esta resuelta o cerrada. Revisa si corresponde reabrirla antes de incorporar el correo.');
+            $solicitud=substr(hash('sha256','gmail:' . $correo['buzon'] . ':' . $correo['mensaje_id']),0,32);
+            if (soporte_responder($pdo,$id,$usuario,$correo['cuerpo'],false,$solicitud)!=='ok') throw new RuntimeException('No se pudo incorporar la respuesta; revisa la conversacion.');
+        } else {
         $stmt=$pdo->prepare("INSERT INTO incidencias (titulo,descripcion,cliente_id,creado_por,estado,urgencia,idioma) VALUES (?,?,?,?,'abierta','leve','es')");
         $stmt->execute([$correo['asunto'],$correo['cuerpo'],$usuario['cliente_id'],$usuario['id']]);$id=(int)$pdo->lastInsertId();
         trabajos_encolar($pdo,'clasificar',['id_incidencia'=>$id]);
+        }
         $stmt=$pdo->prepare("UPDATE gmail_entradas SET estado='importado',incidencia_id=?,revisado_por=? WHERE id=?");$stmt->execute([$id,$revisor,$entrada]);
         auditar($pdo,'importar_gmail','entrada #' . $entrada . ' -> incidencia #' . $id);
         $pdo->commit(); return $id;

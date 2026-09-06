@@ -7,8 +7,9 @@
   informes, portal y predicciones. No pausa ni modifica los objetivos SLA.
 - Gmail / Workspace: conector OAuth de solo lectura, lotes con cursor y
   deduplicacion, bandeja de revision administrativa y alta supervisada con IA.
-  Requiere consentimiento del propietario; los hilos existentes se bloquean
-  hasta incorporar el flujo de respuestas por correo.
+  Respuestas supervisadas sobre el mismo hilo, visibles en la conversacion,
+  con aislamiento por cliente y retorno desde Esperando al cliente a En trabajo.
+  No reabre incidencias cerradas. Requiere consentimiento del propietario.
 
 - IA bajo demanda en predicciones, redaccion de respuestas compartidas y
   organizacion del reparto. Validacion estructurada, cache privada y propuestas
