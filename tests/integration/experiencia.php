@@ -104,7 +104,7 @@ try {
     comprobar((int)$pdo->query('SELECT COUNT(*) FROM llm_logs WHERE usuario_id=1 AND incidencia_id=2')->fetchColumn()===1,'Trazabilidad IA por usuario e incidencia');
     foreach (['analisis.php?stream=1', 'analisis_seguridad.php?stream=1'] as $ruta) {
         [$codigo,$html]=peticion($ruta,$admin);
-        comprobar($codigo===200 && str_contains($html,'Analisis') && str_contains($html,'Finalizado correctamente'),"Streaming completo: $ruta");
+        comprobar($codigo===200 && str_contains($html,'Analisis') && str_contains($html,'Finalizado correctamente'),"Streaming completo: $ruta (HTTP $codigo): " . substr($html,-700));
     }
     [, $html]=peticion('copiloto_incidencia.php',$admin,['id_incidencia'=>1,'csrf'=>$token]);
     $copiloto=json_decode($html,true);
@@ -131,6 +131,8 @@ try {
     require __DIR__ . '/soporte.php';
     probar_soporte($pdo, $admin, $cliente);
     probar_operacion($pdo, $admin, $entorno, $preparacion, $raiz);
+    require __DIR__ . '/profesional.php';
+    probar_profesional($pdo, $admin, $cliente, $agente, $raiz);
     echo "OK: $comprobaciones comprobaciones HTTP y de integridad. Base aislada: $nombre\n";
     if (in_array('--visual',$argv,true)) {
         echo "Revision visual disponible en http://127.0.0.1:8091. Usuarios de prueba admin@pruebas.test / cliente@pruebas.test. Pulsa Enter para limpiar.\n";

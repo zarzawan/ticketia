@@ -3,6 +3,7 @@
 function probar_operacion(PDO $pdo, string $admin, array $entorno, string $preparacion, string $raiz): void {
     require_once $raiz . '/src/entorno.php';
     require_once $raiz . '/src/dominio.php';
+    require_once $raiz . '/src/calendario.php';
     require_once $raiz . '/src/bandeja.php';
     require_once $raiz . '/src/trabajos.php';
     comprobar(str_starts_with((string)$pdo->query('SELECT DATABASE()')->fetchColumn(), 'ticketia_pruebas_'), 'Solo base de pruebas');

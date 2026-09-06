@@ -40,8 +40,19 @@ function bandeja_fuente_sql(PDO $pdo, ?DateTimeImmutable $ahora = null): string 
         COALESCE((SELECT MAX(fecha) FROM mensajes m WHERE m.id_incidencia = i.id), i.fecha_creacion) AS ultima_actividad,
         (SELECT COUNT(*) FROM mensajes m WHERE m.id_incidencia = i.id) AS mensajes_total
         FROM incidencias i LEFT JOIN clientes c ON c.id = i.cliente_id LEFT JOIN usuarios u ON u.id = i.asignado_id";
-    $plazos = "SELECT base.*, DATE_ADD(fecha_creacion, INTERVAL ($respuesta) HOUR) AS limite_respuesta,
-        DATE_ADD(fecha_creacion, INTERVAL ($resolucion) HOUR) AS limite_resolucion,
+    $laboral = !empty($GLOBALS['ticketia_calendario']);
+    $limiteRespuesta = $laboral ? calendario_limite_sql('fecha_creacion', $respuesta) : "DATE_ADD(fecha_creacion, INTERVAL ($respuesta) HOUR)";
+    $limiteResolucion = $laboral ? calendario_limite_sql('fecha_creacion', $resolucion) : "DATE_ADD(fecha_creacion, INTERVAL ($resolucion) HOUR)";
+    $diferencia = static fn(string $desde, string $hasta): string => $laboral
+        ? '(' . calendario_posicion_sql($hasta) . ' - ' . calendario_posicion_sql($desde) . ')'
+        : "TIMESTAMPDIFF(SECOND, $desde, $hasta)";
+    $consumido = $diferencia('fecha_creacion', 'referencia_sla');
+    $duracionRespuesta = $diferencia('fecha_creacion', 'limite_respuesta');
+    $duracionResolucion = $diferencia('fecha_creacion', 'limite_resolucion');
+    $restanteRespuesta = $diferencia('referencia_sla', 'limite_respuesta');
+    $restanteResolucion = $diferencia('referencia_sla', 'limite_resolucion');
+    $plazos = "SELECT base.*, $limiteRespuesta AS limite_respuesta,
+        $limiteResolucion AS limite_resolucion,
         CASE WHEN estado = 'resuelta' THEN COALESCE(fecha_resolucion, $ahora)
              WHEN estado = 'cerrada' THEN COALESCE(fecha_resolucion, fecha_cierre, $ahora)
              ELSE $ahora END AS referencia_sla FROM ($base) base";
@@ -49,19 +60,19 @@ function bandeja_fuente_sql(PDO $pdo, ?DateTimeImmutable $ahora = null): string 
     $fases = "SELECT plazos.*,
         CASE WHEN COALESCE(primera_respuesta, referencia_sla) > limite_respuesta THEN 'vencido'
              WHEN primera_respuesta IS NOT NULL THEN 'cumplido'
-             WHEN ROUND(GREATEST(0, TIMESTAMPDIFF(SECOND, fecha_creacion, referencia_sla)) * 100 / GREATEST(1, TIMESTAMPDIFF(SECOND, fecha_creacion, limite_respuesta))) >= 75 THEN 'riesgo'
+             WHEN ROUND(GREATEST(0, $consumido) * 100 / GREATEST(1, $duracionRespuesta)) >= 75 THEN 'riesgo'
              ELSE 'ok' END AS sla_respuesta,
         CASE WHEN referencia_sla > limite_resolucion THEN 'vencido'
              WHEN estado IN ('resuelta','cerrada') THEN 'cumplido'
-             WHEN ROUND(GREATEST(0, TIMESTAMPDIFF(SECOND, fecha_creacion, referencia_sla)) * 100 / GREATEST(1, TIMESTAMPDIFF(SECOND, fecha_creacion, limite_resolucion))) >= 75 THEN 'riesgo'
+             WHEN ROUND(GREATEST(0, $consumido) * 100 / GREATEST(1, $duracionResolucion)) >= 75 THEN 'riesgo'
              ELSE 'ok' END AS sla_resolucion FROM ($plazos) plazos";
     $sla = "SELECT fases.*,
         CASE WHEN sla_respuesta = 'vencido' OR sla_resolucion = 'vencido' THEN 'vencido'
              WHEN sla_respuesta = 'riesgo' OR sla_resolucion = 'riesgo' THEN 'riesgo'
              WHEN estado IN ('resuelta','cerrada') THEN 'cumplido' ELSE 'ok' END AS sla_estado,
         CASE WHEN primera_respuesta IS NULL AND sla_respuesta IN ('riesgo','vencido')
-             THEN TIMESTAMPDIFF(SECOND, referencia_sla, limite_respuesta)
-             ELSE TIMESTAMPDIFF(SECOND, referencia_sla, limite_resolucion) END AS sla_restante
+             THEN $restanteRespuesta
+             ELSE $restanteResolucion END AS sla_restante
         FROM ($fases) fases";
     return "(SELECT sla.*, LEAST(100,
         CASE urgencia WHEN 'critico' THEN 55 WHEN 'urgente' THEN 30 ELSE 10 END

@@ -137,7 +137,13 @@ Control de coste: `LLM_SOLO_LOCAL=1` ignora los proveedores de pago aunque haya 
 `LLM_LOG_RETENTION_DIAS` define cuantos dias se conservan las trazas; el worker
 elimina los registros antiguos por lotes.
 
-## Worker de trabajos IA
+## Operacion profesional
+
+Consulta la [guia de actualizacion y puesta en servicio](docs/OPERACION_PROFESIONAL.md)
+para activar borradores privados, fuentes del copiloto, equipos, calendario laboral
+y el panel de entregas y conservacion. Las migraciones no se aplican solas.
+
+## Worker de trabajos IA y correo
 
 Las tareas de IA que fallan (proveedor caído, timeout) se encolan y se reintentan con
 backoff. El mismo worker aplica el cierre y archivo automáticos. Programa el proceso con

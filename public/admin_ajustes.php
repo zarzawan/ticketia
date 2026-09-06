@@ -224,7 +224,7 @@ ui_admin_cabecera('Configuracion', 'Define como trabaja tu servicio: IA, comprom
 
 <div class="incidencia-box compact-box">
     <div class="section-head">
-        <div><h2 id="configSLA">Compromisos de servicio (SLA)</h2><p class="help-line">Define cuanto tiempo tiene el equipo para responder y resolver. Los objetivos se miden en horas naturales; las excepciones por tipo prevalecen sobre la regla general.</p></div>
+        <div><h2 id="configSLA">Compromisos de servicio (SLA)</h2><p class="help-line">Define cuanto tiempo tiene el equipo para responder y resolver. Las excepciones por tipo prevalecen sobre la regla general. Modo: <?= empty($GLOBALS['ticketia_calendario']) ? 'horas naturales' : 'horas laborales' ?>. <a href="admin_calendario.php">Configurar y simular horario</a>.</p></div>
     </div>
     <form method="POST" class="filter-form-modern">
         <?= csrf_campo() ?>

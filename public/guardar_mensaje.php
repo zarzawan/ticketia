@@ -62,6 +62,8 @@ $idioma_original = (string)($incidencia['idioma'] ?? 'es');
 
 // Las notas internas nunca se traducen: son para el equipo, no para el cliente.
 $mensaje_final = $mensaje;
+$solicitud = (string)($_POST['solicitud_id'] ?? bin2hex(random_bytes(16)));
+$huella = $es_cliente ? '' : (string)($_POST['huella'] ?? '');
 if (!$interno && $autor === 'tecnico' && $idioma_original !== 'es') {
     $contexto_traduccion = "Texto: \"$mensaje\"";
     $pregunta_traduccion = "Traduce el texto del idioma 'es' al idioma '$idioma_original'. Devuelve solo el texto traducido.";
@@ -75,22 +77,21 @@ if (!$interno && $autor === 'tecnico' && $idioma_original !== 'es') {
 }
 
 if ($accion === 'resolver') {
-    if (!incidencia_resolver($pdo, (int)$id_incidencia, (string)($_POST['resolucion_codigo'] ?? 'solucion_permanente'), $mensaje_final)) {
+    if (!incidencia_resolver($pdo, (int)$id_incidencia, (string)($_POST['resolucion_codigo'] ?? 'solucion_permanente'), $mensaje_final, $huella, $solicitud)) {
         header("Location: ver_incidencia.php?id=$id_incidencia&resolucion=error");
         exit;
     }
     auditar($pdo, 'resolver_incidencia', "incidencia #$id_incidencia desde conversacion");
 } else {
-$sql = "INSERT INTO mensajes (id_incidencia, usuario_id, autor, mensaje, interno, fecha)
-        VALUES (:id_incidencia, :usuario_id, :autor, :mensaje, :interno, NOW())";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([
-    ':id_incidencia' => $id_incidencia,
-    ':usuario_id' => $usuario['id'] ?? null,
-    ':autor' => $autor,
-    ':mensaje' => $mensaje_final,
-    ':interno' => $interno ? 1 : 0
-]);
+    $guardado = soporte_responder($pdo, (int)$id_incidencia, $usuario, $mensaje_final, $interno, $solicitud, $huella);
+    if ($guardado === 'conflicto') {
+        header("Location: $pagina_detalle?id=$id_incidencia&conflicto=1");
+        exit;
+    }
+    if ($guardado === 'duplicado') {
+        header("Location: $pagina_detalle?id=$id_incidencia&comentario=ok#ultimoMensaje");
+        exit;
+    }
 }
 if (!$interno && $autor === 'tecnico' && ($_POST['origen_ia'] ?? '') === 'copiloto') {
     gobierno_ia_feedback_guardar(
@@ -105,14 +106,10 @@ if (!$interno && $autor === 'tecnico' && ($_POST['origen_ia'] ?? '') === 'copilo
 }
 auditar($pdo, $interno ? 'nota_interna' : 'nuevo_mensaje', "incidencia #$id_incidencia");
 
-// La primera respuesta publica del equipo mueve automaticamente el ticket a
-// trabajo activo. Las notas internas no alteran el flujo.
-if ($accion !== 'resolver' && !$interno && $autor === 'tecnico' && ($incidencia['estado'] ?? '') === 'abierta') {
-    $pdo->prepare("UPDATE incidencias SET estado = 'en_curso', fecha_cierre = NULL WHERE id = :id")
-        ->execute([':id' => $id_incidencia]);
-    $pdo->prepare("INSERT INTO cambios_estado (id_incidencia, usuario_id, estado_anterior, estado_nuevo) VALUES (:id, :usuario, 'abierta', 'en_curso')")
-        ->execute([':id' => $id_incidencia, ':usuario' => $usuario['id'] ?? null]);
-    auditar($pdo, 'inicio_automatico', "incidencia #$id_incidencia por respuesta del equipo");
+// No borra una version mas reciente guardada desde otra pestana.
+if (!$es_cliente && soporte_esquema_disponible($pdo)) {
+    $pdo->prepare('DELETE FROM soporte_borradores WHERE usuario_id = :usuario AND incidencia_id = :id AND version = :version')
+        ->execute([':usuario' => $usuario['id'], ':id' => $id_incidencia, ':version' => (int)($_POST['borrador_version'] ?? -1)]);
 }
 
 // Notificar por email (nunca las notas internas).

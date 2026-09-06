@@ -4904,3 +4904,16 @@ body :where(input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]
     html { scroll-behavior: auto; }
     *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+/* Vista de trabajo lateral: conserva la posicion de la bandeja. */
+.ticket-preview { width: min(960px, 94vw); height: 94dvh; max-height: 94dvh; margin: auto 12px auto auto; padding: 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text); }
+.ticket-preview::backdrop { background: #0f172a88; }
+.ticket-preview iframe { width: 100%; height: calc(100% - 52px); border: 0; margin-top: 10px; border-radius: 10px; }
+.asignarme-link { color: var(--primary); background: transparent; border: 0; text-decoration: underline; cursor: pointer; font: inherit; font-size: 12px; padding: 4px; }
+#copilotFuentes a { overflow-wrap: anywhere; }
+#avisoActualizacion[hidden] { display: none; }
+.en-vista-previa .support-sidebar, .en-vista-previa .support-topbar, .en-vista-previa .support-back-link { display: none; }
+.en-vista-previa .support-shell { display: block; padding-left: 0; margin-left: 0; }
+.en-vista-previa .support-main { margin-left: 0; }
+.en-vista-previa .support-content { padding: 20px; }
+.en-vista-previa .support-simple-detail .detail-layout { grid-template-columns: minmax(0,1fr) 240px; }
+@media (max-width: 700px) { .en-vista-previa .support-simple-detail .detail-layout { grid-template-columns: minmax(0,1fr); } }

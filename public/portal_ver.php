@@ -16,15 +16,8 @@ $stmt->execute([':id' => $id]);
 $incidencia = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Solo la conversacion publica: las notas internas jamas salen del equipo.
-$stmt = $pdo->prepare(
-    "SELECT m.autor, m.mensaje, m.fecha, u.nombre AS usuario_nombre
-     FROM mensajes m
-     LEFT JOIN usuarios u ON u.id = m.usuario_id
-     WHERE m.id_incidencia = :id AND m.interno = 0
-     ORDER BY m.fecha ASC"
-);
-$stmt->execute([':id' => $id]);
-$mensajes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$paginaMensajes = soporte_mensajes($pdo, (int)$id, true, max(0, (int)($_GET['antes'] ?? 0)));
+$mensajes = $paginaMensajes['mensajes'];
 
 $adjuntos = adjuntos_de($pdo, (int)$id);
 
@@ -32,7 +25,9 @@ $id_incidencia = (int)$id;
 $estado_label = ui_estado_label((string)$incidencia['estado']);
 $es_activa = in_array((string)$incidencia['estado'], dominio_estados_activos(), true);
 
-$ultimoAutor = $mensajes ? (string)end($mensajes)['autor'] : null;
+$stmt = $pdo->prepare('SELECT autor FROM mensajes WHERE id_incidencia = :id AND interno = 0 ORDER BY fecha DESC, id DESC LIMIT 1');
+$stmt->execute([':id' => $id]);
+$ultimoAutor = $stmt->fetchColumn() ?: null;
 $siguienteAccion = portal_siguiente_accion($incidencia['estado'], $ultimoAutor);
 $valoracion = null;
 $puedeValorar = (int)$incidencia['creado_por'] === (int)$usuario['id']
@@ -52,6 +47,9 @@ ui_portal_cabecera('Solicitud #' . $id_incidencia);
 </ol>
 <section class="next-action action-<?= $siguienteAccion['tono'] ?>"><div><?= ui_icono('flujo') ?></div><div><strong><?= ui_e($siguienteAccion['titulo']) ?></strong><p><?= ui_e($siguienteAccion['detalle']) ?></p></div></section>
 <div class="request-detail-layout"><div>
+    <?php if ($paginaMensajes['antes']): ?><a href="?id=<?= (int)$id ?>&amp;antes=<?= $paginaMensajes['antes'] ?>">Cargar mensajes anteriores</a><?php endif; ?>
+    <?php if (!empty($_GET['antes'])): ?><a href="?id=<?= (int)$id ?>">Volver a los mas recientes</a><?php endif; ?>
+    <?php if (isset($_GET['conflicto'])): ?><p class="login-error">La solicitud ha cambiado. Revisa su estado antes de volver a responder.</p><?php endif; ?>
     <?php if (isset($_GET['ok'])): ?>
         <div class="success-message">Tu mensaje se ha enviado al equipo de soporte.</div>
     <?php endif; ?>
@@ -116,6 +114,7 @@ ui_portal_cabecera('Solicitud #' . $id_incidencia);
 
         <?php if ($es_activa): ?>
             <form action="guardar_mensaje.php" method="POST" class="composer">
+                <input type="hidden" name="solicitud_id" value="<?= bin2hex(random_bytes(16)) ?>">
                 <input type="hidden" name="id_incidencia" value="<?= $id_incidencia ?>"><?= csrf_campo() ?>
                 <label for="mensajeCliente" class="sr-only">Tu mensaje al equipo</label><textarea id="mensajeCliente" name="mensaje" rows="4" required placeholder="Escribe tu mensaje para el equipo de soporte..."></textarea>
                 <div class="composer-row">

@@ -6,6 +6,22 @@
 
 const TRABAJOS_BACKOFF_MINUTOS = [1 => 2, 2 => 10, 3 => 30]; // por numero de intento
 
+function trabajos_reservas_disponibles(PDO $pdo): bool {
+    try { $pdo->query('SELECT reserva_token FROM trabajos_ia LIMIT 0'); return true; }
+    catch (PDOException $e) { return false; }
+}
+
+/** Recupera reservas abandonadas. Configura los timeouts del proveedor por debajo de 15 minutos. */
+function trabajos_recuperar(PDO $pdo): int {
+    if (!trabajos_reservas_disponibles($pdo)) return 0;
+    return $pdo->exec("UPDATE trabajos_ia SET
+        estado = IF(intentos >= max_intentos, 'fallido', 'pendiente'),
+        reserva_token = NULL, reservado_hasta = NULL, programado_para = NOW(),
+        ultimo_error = 'Ejecucion interrumpida: reserva vencida'
+        WHERE estado = 'en_curso' AND (reservado_hasta < NOW()
+            OR (reservado_hasta IS NULL AND actualizado_en < NOW() - INTERVAL 15 MINUTE)) LIMIT 500");
+}
+
 /** Encola un trabajo. $payload se guarda como JSON. */
 function trabajos_encolar(PDO $pdo, string $tipo, array $payload, int $max_intentos = 3): int {
     $pdo->prepare(
@@ -23,6 +39,8 @@ function trabajos_encolar(PDO $pdo, string $tipo, array $payload, int $max_inten
  * Devuelve la fila del trabajo o null si no hay nada que hacer.
  */
 function trabajos_reclamar(PDO $pdo): ?array {
+    $reservas = trabajos_reservas_disponibles($pdo);
+    trabajos_recuperar($pdo);
     $pdo->beginTransaction();
     try {
         $trabajo = $pdo->query(
@@ -36,12 +54,17 @@ function trabajos_reclamar(PDO $pdo): ?array {
             return null;
         }
 
-        $pdo->prepare(
-            "UPDATE trabajos_ia SET estado = 'en_curso', intentos = intentos + 1 WHERE id = :id"
-        )->execute([':id' => $trabajo['id']]);
+        $token = bin2hex(random_bytes(16));
+        $sql = "UPDATE trabajos_ia SET estado = 'en_curso', intentos = intentos + 1";
+        if ($reservas) $sql .= ', reserva_token = :token, reservado_hasta = NOW() + INTERVAL 15 MINUTE';
+        $sql .= ' WHERE id = :id';
+        $params = [':id' => $trabajo['id']];
+        if ($reservas) $params[':token'] = $token;
+        $pdo->prepare($sql)->execute($params);
         $pdo->commit();
 
         $trabajo['intentos'] = (int)$trabajo['intentos'] + 1;
+        if ($reservas) $trabajo['reserva_token'] = $token;
         return $trabajo;
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -51,16 +74,23 @@ function trabajos_reclamar(PDO $pdo): ?array {
 
 /** Marca el resultado de un trabajo: completado, o pendiente/fallido segun reintentos. */
 function trabajos_resolver(PDO $pdo, array $trabajo, bool $exito, string $error = ''): void {
+    $filtro = " WHERE id = :id AND estado = 'en_curso'";
+    $params = [':id' => $trabajo['id']];
+    if (!empty($trabajo['reserva_token'])) {
+        $filtro .= ' AND reserva_token = :token';
+        $params[':token'] = $trabajo['reserva_token'];
+    }
     if ($exito) {
-        $pdo->prepare("UPDATE trabajos_ia SET estado = 'completado', ultimo_error = NULL WHERE id = :id")
-            ->execute([':id' => $trabajo['id']]);
+        // Los correos completados no conservan destinatarios ni cuerpo indefinidamente.
+        $pdo->prepare("UPDATE trabajos_ia SET estado = 'completado', ultimo_error = NULL,
+            payload = IF(tipo = 'correo', '{}', payload)" . $filtro)->execute($params);
         return;
     }
 
     $intentos = (int)$trabajo['intentos'];
     if ($intentos >= (int)$trabajo['max_intentos']) {
-        $pdo->prepare("UPDATE trabajos_ia SET estado = 'fallido', ultimo_error = :e WHERE id = :id")
-            ->execute([':e' => mb_substr($error, 0, 255), ':id' => $trabajo['id']]);
+        $pdo->prepare("UPDATE trabajos_ia SET estado = 'fallido', ultimo_error = :e" . $filtro)
+            ->execute($params + [':e' => mb_substr($error, 0, 255)]);
         return;
     }
 
@@ -68,8 +98,8 @@ function trabajos_resolver(PDO $pdo, array $trabajo, bool $exito, string $error 
     $pdo->prepare(
         "UPDATE trabajos_ia SET estado = 'pendiente', ultimo_error = :e,
                 programado_para = NOW() + INTERVAL :m MINUTE
-         WHERE id = :id"
-    )->execute([':e' => mb_substr($error, 0, 255), ':m' => $minutos, ':id' => $trabajo['id']]);
+         " . $filtro
+    )->execute($params + [':e' => mb_substr($error, 0, 255), ':m' => $minutos]);
 }
 
 /**
@@ -82,6 +112,9 @@ function trabajos_ejecutar(PDO $pdo, array $trabajo): array {
     $payload = json_decode((string)$trabajo['payload'], true) ?: [];
 
     switch ($trabajo['tipo']) {
+        case 'correo':
+            $exito = correo_enviar_directo($payload['destinatarios'] ?? [], (string)($payload['asunto'] ?? ''), (string)($payload['html'] ?? ''), 'ticketia-' . $trabajo['id']);
+            return [$exito, $exito ? '' : 'SMTP no disponible o envio rechazado'];
         case 'clasificar':
             $id = (int)($payload['id_incidencia'] ?? 0);
             gobierno_ia_contexto_establecer($id);
@@ -95,7 +128,20 @@ function trabajos_ejecutar(PDO $pdo, array $trabajo): array {
             if ($clasificacion === null) {
                 return [false, 'La clasificacion IA no devolvio resultado (proveedor caido o respuesta invalida)'];
             }
-            clasificacion_aplicar($pdo, $id, $clasificacion);
+            $pdo->beginTransaction();
+            try {
+                if (!empty($trabajo['reserva_token'])) {
+                    $stmt = $pdo->prepare('SELECT reserva_token FROM trabajos_ia WHERE id = :id FOR UPDATE');
+                    $stmt->execute([':id' => $trabajo['id']]);
+                    if ($stmt->fetchColumn() !== $trabajo['reserva_token']) { $pdo->rollBack(); return [false, 'Reserva sustituida']; }
+                }
+                clasificacion_aplicar($pdo, $id, $clasificacion);
+                trabajos_resolver($pdo, $trabajo, true);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
             return [true, ''];
 
         default:
@@ -142,7 +188,7 @@ function trabajos_procesar_lote(PDO $pdo, int $lote = 10, ?callable $latido = nu
 function trabajos_estado(PDO $pdo): array {
     try {
         $filas = $pdo->query(
-            "SELECT estado, COUNT(*) AS n FROM trabajos_ia GROUP BY estado"
+            "SELECT estado, COUNT(*) AS n FROM trabajos_ia WHERE tipo <> 'correo' GROUP BY estado"
         )->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (PDOException $e) {
         return []; // migracion aun no aplicada

@@ -25,7 +25,9 @@ if ($stmt->fetchColumn() !== 'resuelta') {
 }
 
 if ($decision === 'aceptar') {
-    incidencia_cambiar_estado($pdo, (int)$id, 'cerrada');
+    if (!incidencia_cambiar_estado($pdo, (int)$id, 'cerrada', ['resuelta'])) {
+        header("Location: portal_ver.php?id=$id&conflicto=1"); exit;
+    }
     auditar($pdo, 'aceptar_resolucion', "incidencia #$id");
     header("Location: portal_ver.php?id=$id&confirmacion=aceptada");
     exit;
@@ -36,9 +38,9 @@ if ($motivo === '') {
     exit;
 }
 
-$pdo->prepare("INSERT INTO reaperturas (id_incidencia, motivo) VALUES (:id, :motivo)")
-    ->execute([':id' => $id, ':motivo' => $motivo]);
-incidencia_cambiar_estado($pdo, (int)$id, 'en_curso');
+if (!incidencia_cambiar_estado($pdo, (int)$id, 'en_curso', ['resuelta'], $motivo)) {
+    header("Location: portal_ver.php?id=$id&conflicto=1"); exit;
+}
 auditar($pdo, 'rechazar_resolucion', "incidencia #$id");
 header("Location: portal_ver.php?id=$id&confirmacion=rechazada");
 exit;
