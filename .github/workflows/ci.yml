@@ -76,7 +76,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
-    name: Smoke test Docker
+    # Nombre estable requerido por la proteccion de main; incluye build y smoke test.
+    name: Build de la imagen Docker
     runs-on: ubuntu-latest
     env:
       APP_PORT: "8080"
