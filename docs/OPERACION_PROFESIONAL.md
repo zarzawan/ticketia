@@ -9,9 +9,10 @@ automaticamente sobre una instalacion existente.
 1. Realizar una copia de base de datos, adjuntos y configuracion. Conservarla
    cifrada fuera del servidor y comprobar una restauracion aislada.
 2. Programar una ventana de mantenimiento y detener ordenadamente el worker.
-3. Actualizar el codigo y aplicar exclusivamente migraciones (no ejecutar seeds):
+3. Actualizar el codigo y las dependencias, y aplicar exclusivamente migraciones (no ejecutar seeds):
 
    ```powershell
+   composer install --no-dev --prefer-dist --no-interaction
    & C:\xampp\php\php.exe vendor/bin/phinx migrate -c phinx.php
    ```
 

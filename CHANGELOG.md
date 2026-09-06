@@ -1,6 +1,35 @@
 # Changelog
 
-## Proximamente
+## [2.0.0] - 2026-09-07
+
+### Operacion profesional
+
+- Respuestas idempotentes y transaccionales; control de cambios concurrentes y
+  reaperturas atomicas, tambien compatibles con acciones masivas.
+- Borradores privados con guardado automatico, vista previa del Kanban, asignacion
+  propia en un clic y conversaciones paginadas por cursor.
+- Copiloto con fuentes de conocimiento publicado y soluciones del mismo cliente;
+  memoria progresiva acotada y retirada del porcentaje de confianza autodeclarado.
+- Recuperacion de reservas interrumpidas y cola de correo con reintentos. Los
+  mensajes de recuperacion de contrasena mantienen el envio directo.
+- Centro de operaciones con alertas, entregas, conservacion tecnica confirmada y
+  registro de comprobaciones manuales de restauracion.
+- Equipos y reparto automatico con simulacion obligatoria antes de activar reglas.
+- Calendario laboral opcional con jornada y festivos, y calculo de hora civil
+  consistente entre SQL y PHP sin reinterpretar fechas historicas.
+- Valoraciones de utilidad de las guias y deteccion de conocimiento por revisar.
+- 56 pruebas unitarias, 419 comprobaciones HTTP, ensayo con 10000 mensajes,
+  receptor SMTP ficticio y comprobaciones de navegador en escritorio y movil.
+
+### Actualizacion desde 1.0.0
+
+- Crear y comprobar una copia antes de actualizar. Ejecutar las migraciones
+  pendientes con Phinx, nunca los seeds, y reiniciar el worker de forma planificada.
+- El worker pasa a ser necesario para entregar notificaciones ordinarias de soporte.
+- Las reglas y el calendario quedan desactivados hasta su configuracion explicita.
+- Las incidencias y adjuntos se conservan; no hay purga automatica del contenido
+  del cliente. SMTP puede repetir una entrega si se pierde su confirmacion.
+- Instrucciones y limites: [Operacion profesional](docs/OPERACION_PROFESIONAL.md).
 
 ### Mejorado
 
@@ -47,7 +76,7 @@
 - Nuevo espacio profesional de soporte con navegacion lateral, cabecera adaptable y una jerarquia comun para bandeja y detalle.
 - Bandeja simplificada sin accesos duplicados: las colas y el alta de incidencias viven en el menu lateral, mientras el resumen y la analitica permanecen visibles sobre los filtros.
 - Colas inteligentes para incidencias que requieren respuesta, SLA en riesgo, espera del cliente y tickets sin asignar.
-- Lista operativa predeterminada y Kanban opcional, con prioridad explicable, siguiente paso en lenguaje claro, ordenacion por columna, seleccion multiple y acciones masivas seguras.
+- Lista operativa alternativa al Kanban, con prioridad explicable, siguiente paso en lenguaje claro, ordenacion por columna, seleccion multiple y acciones masivas seguras.
 - SLA configurables por nivel de cliente, tipo de incidencia y urgencia, con objetivos de primera respuesta y resolucion visibles en tarjetas y detalle.
 - Copiloto IA por incidencia con traduccion, borrador reutilizable y asistencia comercial integrada con el catalogo.
 - Actividad compacta sin repetir descripciones ni mensajes, con enlaces al contenido relacionado.
