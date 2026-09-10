@@ -13,7 +13,11 @@
 3. Crea una etiqueta exclusiva (por ejemplo TicketIA) y un filtro en Gmail que
    etiquete lo que quieras revisar. Obtiene su ID mediante `users.labels.list`
    de Gmail API, con la misma cuenta autorizada. Se configura el ID, no el nombre.
-4. Guarda `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`,
+4. En Administracion > Conexiones y claves > Gmail, introduce los datos OAuth,
+   el buzon principal y el ID de etiqueta. Guarda cifrado y pulsa Comprobar conexion
+   para verificar cuenta y etiqueta sin importar correo. Requiere APP_KEY y tu
+   contrasena de administrador; consulta [INTEGRACIONES.md](INTEGRACIONES.md).
+   Alternativamente guarda `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`,
    `GMAIL_BUZON` y `GMAIL_LABEL_ID` en el `.env` privado del servidor. `GMAIL_BUZON`
    debe ser la direccion principal que devuelve el perfil de la cuenta autorizada.
    Protege el archivo con permisos del usuario del servicio.
@@ -36,6 +40,8 @@ programa, pero no reduce el permiso concedido por Google. Utiliza un buzon dedic
 La bandeja de administracion tambien muestra el diagnostico local y los pasos
 pendientes, sin mostrar valores privados. El PHP web y el de consola pueden usar
 configuraciones diferentes: comprueba ambos entornos.
+El diagnostico local no contacta con Google; el boton Comprobar conexion del nuevo
+apartado si lo hace, pero no importa mensajes. No son la misma comprobacion.
 Google puede imponer requisitos de verificacion y politicas segun la audiencia y
 el estado de la aplicacion OAuth. Revisa esos requisitos con el administrador.
 

@@ -4931,3 +4931,15 @@ body :where(input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]
 .en-vista-previa .support-content { padding: 20px; }
 .en-vista-previa .support-simple-detail .detail-layout { grid-template-columns: minmax(0,1fr) 240px; }
 @media (max-width: 700px) { .en-vista-previa .support-simple-detail .detail-layout { grid-template-columns: minmax(0,1fr); } }
+
+/* Configuracion de secretos: un campo por fila, tambien en pantallas pequenas. */
+.admin-panel.conexion-panel { max-width: 900px; }
+.conexion-panel .service-subnav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.conexion-panel .service-subnav a[aria-current="page"] { background: var(--primary); color: #fff; }
+.conexion-campos { display: grid; gap: 10px; min-width: 0; margin: 20px 0 0; padding: 0; border: 0; }
+.conexion-campos legend { font-weight: 700; margin-bottom: 16px; }
+.conexion-campos > label { display: block; margin-top: 8px; font-weight: 600; }
+.conexion-campos > input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; }
+.conexion-campos .page-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.conexion-campos details { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.conexion-campos details label { display: block; margin: 12px 0; }

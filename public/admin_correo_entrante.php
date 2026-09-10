@@ -32,6 +32,7 @@ ui_admin_cabecera('Correo entrante','Google Workspace / Gmail: revisar, validar 
 <?php if($aviso):?><p class="success-message"><?= ui_e($aviso) ?></p><?php endif; ?>
 <?php if($error):?><p class="login-error"><?= ui_e($error) ?></p><?php endif; ?>
 <section class="admin-panel"><h2><?= $diagnostico['completo'] ? 'Configuracion local completa' : 'Prepara la conexion con Gmail' ?></h2>
+<p><a class="card-button" href="admin_integraciones.php?grupo=gmail">Configurar Gmail y comprobar conexion</a></p>
 <p>Esta comprobacion no contacta con Google y no confirma que la autorizacion siga vigente. Nunca se muestran las credenciales.</p>
 <?php if($diagnostico['faltan']):?><p>Configura en el archivo privado del servidor: <code><?= ui_e(implode(', ',$diagnostico['faltan'])) ?></code>.</p><?php endif;?>
 <?php if($diagnostico['invalidos']):?><p>Revisa el formato de <code><?= ui_e(implode(', ',$diagnostico['invalidos'])) ?></code>. Usa una direccion de correo y el ID de etiqueta, no su nombre.</p><?php endif;?>

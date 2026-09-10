@@ -30,6 +30,9 @@ try {
 // 'temperature' => null significa no enviar el parametro.
 // ---------------------------------------------------------------------------
 
+require_once __DIR__ . '/seguridad_cuenta.php';
+require_once __DIR__ . '/integraciones.php';
+integraciones_cargar($pdo);
 $llm_provider = (string)entorno_valor('LLM_PROVIDER', 'local');
 
 $llm_config = [

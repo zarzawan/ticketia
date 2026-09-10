@@ -242,6 +242,7 @@ function ui_admin_nav(string $activa): string {
         'admin_catalogo.php' => ['Catalogo comercial', 'Productos para el asistente', 'catalogo', 'Servicio'],
         'ver_logs_llm.php' => ['Control de IA', 'Calidad, consumo y errores', 'ia', 'Plataforma'],
         'admin_ajustes.php' => ['Configuracion', 'IA, SLA y mantenimiento', 'ajustes', 'Plataforma'],
+        'admin_integraciones.php' => ['Conexiones y claves', 'Gmail y credenciales IA', 'ajustes', 'Plataforma'],
         'admin_auditoria.php' => ['Auditoria', 'Registro de acciones', 'historial', 'Plataforma'],
     ];
 

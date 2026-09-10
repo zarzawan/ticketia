@@ -160,7 +160,7 @@ ui_admin_cabecera('Configuracion', 'Define como trabaja tu servicio: IA, comprom
                 <div class="login-error" style="margin-top:10px;">Fallo tras <?= (int)$resultado_prueba['ms'] ?> ms. <?= ui_e($resultado_prueba['respuesta']) ?></div>
             <?php endif; ?>
         <?php endif; ?>
-        <p class="help-line">Los endpoints y claves se configuran en el fichero .env; los cambios de proveedor hechos aqui se guardan en la base de datos.</p>
+        <p class="help-line"><a href="admin_integraciones.php?grupo=openai">Configurar claves y modelos de IA</a>. El endpoint local permanece en el entorno del servidor; seleccionar un proveedor aqui no modifica sus credenciales.</p>
 
         <h2 style="margin-top:18px;">Cola de trabajos IA</h2>
         <?= ui_worker_estado($salud_worker) ?>

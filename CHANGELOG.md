@@ -2,6 +2,10 @@
 
 ## Proximamente — v2.1 en desarrollo
 
+- Conexiones y claves en administracion: Gmail, OpenAI, xAI e IA local con
+  almacenamiento cifrado, confirmacion de contrasena y control de ediciones.
+  Pruebas explicitas de cuenta/etiqueta Gmail y acceso a modelos IA sin enviar
+  incidencias ni generar texto. Requiere APP_KEY; no cambia el streaming.
 - Estado explicito Esperando al cliente: peticion publica y transicion atomicas,
   retorno a En trabajo al responder el cliente, cola propia y presencia en
   informes, portal y predicciones. No pausa ni modifica los objetivos SLA.
