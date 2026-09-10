@@ -38,7 +38,7 @@ $estado_titulo = ucfirst(str_replace('_', ' ', $incidencia['estado']));
 
 // Mapas de traducción para valores codificados
 $urgMap = ['critico' => 'c', 'urgente' => 'u', 'leve' => 'l'];
-$estMap = ['abierta' => 'a', 'en_curso' => 'e', 'cerrada' => 'z'];
+$estMap = ['abierta' => 'a', 'en_curso' => 'e', 'esperando_cliente' => 'w', 'resuelta' => 'r', 'cerrada' => 'z'];
 $autorMap = ['c' => 'cliente', 't' => 'técnico'];
 $keyMap = [
     'id' => 'identificador',
@@ -346,6 +346,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
-
 

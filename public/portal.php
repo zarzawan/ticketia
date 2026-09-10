@@ -9,7 +9,7 @@ $cursor = max(0, (int)($_GET['antes_de'] ?? 0));
 $ambitoSql = $usuario['cliente_id'] !== null ? 'i.cliente_id = :ambito' : 'i.creado_por = :ambito';
 $ambito = $usuario['cliente_id'] ?? $usuario['id'];
 $ultimoAutor = '(SELECT m.autor FROM mensajes m WHERE m.id_incidencia=i.id AND m.interno=0 ORDER BY m.fecha DESC,m.id DESC LIMIT 1)';
-$stmt = $pdo->prepare("SELECT SUM(i.estado IN ('abierta','en_curso','resuelta')) AS activas, SUM(i.estado='resuelta') AS resueltas, SUM(i.estado='cerrada') AS historial, SUM(i.estado IN ('abierta','en_curso') AND $ultimoAutor='tecnico') AS respuesta FROM incidencias i WHERE $ambitoSql");
+$stmt = $pdo->prepare("SELECT SUM(i.estado IN ('abierta','en_curso','esperando_cliente','resuelta')) AS activas, SUM(i.estado='resuelta') AS resueltas, SUM(i.estado='cerrada') AS historial, SUM(i.estado IN ('abierta','en_curso','esperando_cliente') AND $ultimoAutor='tecnico') AS respuesta FROM incidencias i WHERE $ambitoSql");
 $stmt->execute([':ambito'=>$ambito]); $stats = $stmt->fetch(PDO::FETCH_ASSOC);
 $sql = "SELECT i.id,i.titulo,i.estado,i.fecha_creacion,$ultimoAutor AS ultimo_autor,
     COALESCE((SELECT MAX(m.fecha) FROM mensajes m WHERE m.id_incidencia=i.id AND m.interno=0),i.fecha_creacion) AS ultima_actividad
@@ -18,8 +18,8 @@ $params = [':ambito'=>$ambito];
 $sql .= match ($vista) {
     'historial' => " AND i.estado='cerrada'",
     'resueltas' => " AND i.estado='resuelta'",
-    'respuesta' => " AND i.estado IN ('abierta','en_curso') AND $ultimoAutor='tecnico'",
-    default => " AND i.estado IN ('abierta','en_curso','resuelta')",
+    'respuesta' => " AND i.estado IN ('abierta','en_curso','esperando_cliente') AND $ultimoAutor='tecnico'",
+    default => " AND i.estado IN ('abierta','en_curso','esperando_cliente','resuelta')",
 };
 if ($busqueda !== '') {
     $sql .= ' AND (i.titulo LIKE :titulo OR i.descripcion LIKE :descripcion OR i.id = :numero)';

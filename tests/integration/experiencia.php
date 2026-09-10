@@ -133,6 +133,18 @@ try {
     probar_operacion($pdo, $admin, $entorno, $preparacion, $raiz);
     require __DIR__ . '/profesional.php';
     probar_profesional($pdo, $admin, $cliente, $agente, $raiz);
+    require __DIR__ . '/predicciones.php';
+    probar_predicciones($pdo, $admin, $cliente, $agente);
+    require __DIR__ . '/respuestas.php';
+    probar_respuestas($pdo, $admin, $cliente);
+    require __DIR__ . '/ia_operativa.php';
+    probar_ia_operativa($pdo, $cliente);
+    require __DIR__ . '/espera.php';
+    probar_espera_cliente($pdo, $cliente);
+    require __DIR__ . '/gmail.php';
+    probar_gmail($pdo, $cliente);
+    require __DIR__ . '/integraciones.php';
+    probar_integraciones($pdo,$cliente);
     echo "OK: $comprobaciones comprobaciones HTTP y de integridad. Base aislada: $nombre\n";
     if (in_array('--visual',$argv,true)) {
         echo "Revision visual disponible en http://127.0.0.1:8091. Usuarios de prueba admin@pruebas.test / cliente@pruebas.test. Pulsa Enter para limpiar.\n";

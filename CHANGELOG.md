@@ -1,5 +1,37 @@
 # Changelog
 
+## Proximamente — v2.1 en desarrollo
+
+- Conexiones y claves en administracion: Gmail, OpenAI, xAI e IA local con
+  almacenamiento cifrado, confirmacion de contrasena y control de ediciones.
+  Pruebas explicitas de cuenta/etiqueta Gmail y acceso a modelos IA sin enviar
+  incidencias ni generar texto. Requiere APP_KEY; no cambia el streaming.
+- Estado explicito Esperando al cliente: peticion publica y transicion atomicas,
+  retorno a En trabajo al responder el cliente, cola propia y presencia en
+  informes, portal y predicciones. No pausa ni modifica los objetivos SLA.
+- Gmail / Workspace: conector OAuth de solo lectura, lotes con cursor y
+  deduplicacion, bandeja de revision administrativa y alta supervisada con IA.
+  Respuestas supervisadas sobre el mismo hilo, visibles en la conversacion,
+  con aislamiento por cliente y retorno desde Esperando al cliente a En trabajo.
+  No reabre incidencias cerradas. Requiere consentimiento del propietario.
+  Diagnostico local en administracion y CLI --comprobar, sin contactar con Google
+  ni mostrar credenciales; distingue configuracion de autorizacion verificada.
+
+- IA bajo demanda en predicciones, redaccion de respuestas compartidas y
+  organizacion del reparto. Validacion estructurada, cache privada y propuestas
+  revisables, sin cambios automaticos ni modificaciones del streaming.
+- Equipos y reparto con guia de inicio y deteccion de esquema incompleto.
+
+- Predicciones para administracion: historico por organizacion, graficos de
+  actividad y estados, calidad percibida, cobertura y senales explicables de
+  riesgo y oportunidad. Son reglas orientativas, no probabilidades entrenadas.
+- Colas con contadores, cambio de cola sin arrastrar responsable/estado y entrada
+  al Kanban sin restaurar filtros compartidos entre cuentas del navegador.
+- Biblioteca de cinco respuestas reutilizables con vista previa, insercion sin
+  borrar el borrador, edicion por administradores, desactivacion y control de
+  concurrencia. La migracion 17 habilita persistir las ediciones; las bases se
+  pueden consultar y usar sin ella.
+
 ## [2.0.0] - 2026-09-07
 
 ### Operacion profesional

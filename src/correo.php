@@ -222,6 +222,7 @@ function correo_notificar_estado(PDO $pdo, int $id_incidencia, string $anterior,
     $etiquetas = [
         'abierta' => 'Nueva',
         'en_curso' => 'En trabajo',
+        'esperando_cliente' => 'Esperando al cliente',
         'resuelta' => 'Solucion propuesta',
         'cerrada' => 'Cerrada',
     ];

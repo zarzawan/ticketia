@@ -42,7 +42,7 @@ ui_portal_cabecera('Solicitud #' . $id_incidencia);
 <a class="back-link" href="portal.php">&larr; Mis solicitudes</a>
 <header class="request-detail-heading"><div><span class="section-label">Solicitud #<?= $id_incidencia ?></span><h1><?= ui_e($incidencia['titulo']) ?></h1><p>Creada el <?= ui_e(date('d/m/Y H:i', strtotime($incidencia['fecha_creacion']))) ?></p></div><span class="status-pill pill-estado pill-<?= ui_e(ui_estado_class($incidencia['estado'])) ?>"><?= ui_e($estado_label) ?></span></header>
 <ol class="request-progress" aria-label="Progreso de la solicitud">
-<?php $paso = array_search($incidencia['estado'], ['abierta', 'en_curso', 'resuelta', 'cerrada'], true); ?>
+<?php $paso = $incidencia['estado'] === 'esperando_cliente' ? 1 : array_search($incidencia['estado'], ['abierta', 'en_curso', 'resuelta', 'cerrada'], true); ?>
 <?php foreach (['Recibida', 'En trabajo', 'Solucion propuesta', 'Finalizada'] as $indice=>$etiqueta): ?><li class="<?= $indice <= $paso ? 'is-complete' : '' ?>" <?= $indice === $paso ? 'aria-current="step"' : '' ?>><span><?= $indice + 1 ?></span><?= $etiqueta ?></li><?php endforeach; ?>
 </ol>
 <section class="next-action action-<?= $siguienteAccion['tono'] ?>"><div><?= ui_icono('flujo') ?></div><div><strong><?= ui_e($siguienteAccion['titulo']) ?></strong><p><?= ui_e($siguienteAccion['detalle']) ?></p></div></section>

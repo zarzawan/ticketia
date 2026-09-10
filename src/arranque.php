@@ -14,7 +14,7 @@ Dotenv\Dotenv::createImmutable(TICKETIA_RAIZ)->safeLoad();
 
 require __DIR__ . '/entorno.php';
 require __DIR__ . '/config.php';
-require __DIR__ . '/seguridad_cuenta.php';
+require_once __DIR__ . '/seguridad_cuenta.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/dominio.php';
 require __DIR__ . '/calendario.php';
@@ -63,7 +63,7 @@ if (PHP_SAPI !== 'cli') {
         if (in_array($pagina_actual, $paginas_admin, true)) {
             auth_requerir_rol('admin');
         }
-        if (in_array($pagina_actual, ['admin_operacion.php','admin_reglas.php','admin_calendario.php'], true)) auth_requerir_rol('admin');
+        if (in_array($pagina_actual, ['admin_operacion.php','admin_reglas.php','admin_calendario.php','admin_predicciones.php','admin_ia_operativa.php','admin_correo_entrante.php','admin_integraciones.php'], true)) auth_requerir_rol('admin');
 
         // El rol cliente solo accede a su portal y a los endpoints que este
         // usa; cualquier otra pagina lo devuelve al portal. La comprobacion

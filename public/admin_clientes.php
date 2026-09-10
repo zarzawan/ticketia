@@ -54,7 +54,7 @@ $stmt = $pdo->prepare(
     "SELECT c.*,
             (SELECT COUNT(*) FROM usuarios u WHERE u.cliente_id = c.id) AS usuarios,
             (SELECT COUNT(*) FROM incidencias i WHERE i.cliente_id = c.id) AS tickets,
-            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado IN ('abierta','en_curso')) AS tickets_abiertos
+            (SELECT COUNT(*) FROM incidencias i2 WHERE i2.cliente_id = c.id AND i2.estado IN ('abierta','en_curso','esperando_cliente')) AS tickets_abiertos
      FROM clientes c WHERE $condicion ORDER BY c.nombre, c.id LIMIT 25 OFFSET $offset"
 );
 $stmt->execute($params);
@@ -120,7 +120,7 @@ ui_admin_cabecera('Organizaciones', 'Empresas, contactos y nivel de servicio en 
             <tbody>
                 <?php foreach ($clientes as $c): ?>
                     <tr class="<?= (int)$c['activo'] === 0 ? 'fila-apagada' : '' ?>">
-                        <td><strong><?= ui_e($c['nombre']) ?></strong></td>
+                        <td><a href="admin_predicciones.php?cliente=<?= (int)$c['id'] ?>"><strong><?= ui_e($c['nombre']) ?></strong></a><small class="queue-context"> · Historico y predicciones</small></td>
                         <td><?= ui_e($c['email_contacto'] ?? '-') ?></td>
                         <td><?= ui_e(dominio_niveles_servicio()[$c['nivel_servicio'] ?? 'estandar'] ?? 'Estandar') ?></td>
                         <td><?= (int)$c['usuarios'] ?></td>

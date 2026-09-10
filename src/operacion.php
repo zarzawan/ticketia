@@ -37,7 +37,7 @@ function operacion_alertas(PDO $pdo): array {
         if ($atascados) $alertas[] = ['titulo'=>"$atascados tareas interrumpidas",'detalle'=>'El worker recupera automaticamente las reservas vencidas.','url'=>'admin_operacion.php'];
     }
     $fuente = bandeja_fuente_sql($pdo);
-    $sla = (int)$pdo->query("SELECT COUNT(*) FROM $fuente WHERE estado IN ('abierta','en_curso') AND sla_estado='vencido'")->fetchColumn();
+    $sla = (int)$pdo->query("SELECT COUNT(*) FROM $fuente WHERE estado IN ('abierta','en_curso','esperando_cliente') AND sla_estado='vencido'")->fetchColumn();
     if ($sla) $alertas[] = ['titulo'=>"$sla incidencias con SLA vencido",'detalle'=>'Prioriza las respuestas y resoluciones pendientes.','url'=>'index.php?cola=sla'];
     return $alertas;
 }

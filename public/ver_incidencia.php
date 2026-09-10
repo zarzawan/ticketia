@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../src/arranque.php';
+require_once __DIR__ . '/../src/respuestas.php';
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if ($id === false || $id === null) {
@@ -386,11 +387,17 @@ if (($incidencia['tipo'] ?? '') === 'Comercial' && !$recomendacion_fallida) {
                         <input type="hidden" name="contenido_hash_ia" id="contenidoHashIa" value="">
                         <textarea name="mensaje" id="mensaje" rows="5" maxlength="30000" required placeholder="Escribe la respuesta en espanol...<?= ($incidencia['idioma'] ?? 'es') !== 'es' ? ' Se traducira al idioma original al enviarla.' : '' ?>"><?= ui_e($borrador['mensaje']) ?></textarea>
                         <p class="help-line" id="estadoBorrador" role="status"><?= $borrador['version'] ? 'Borrador privado recuperado' : 'El borrador solo lo puedes ver tu.' ?></p>
-                        <details><summary>Respuestas reutilizables</summary><label for="respuestaRapida">Insertar texto</label><select id="respuestaRapida"><option value="">Seleccionar...</option><option value="Para poder ayudarte, indicanos los pasos para reproducir el problema y el mensaje de error exacto. No incluyas contrasenas ni datos sensibles.">Pedir informacion</option><option value="Hemos recibido la informacion. Vamos a revisarla y te mantendremos al tanto desde esta conversacion.">Confirmar recepcion</option><option value="Puedes comprobar si el problema se ha resuelto y confirmarnos el resultado?">Solicitar comprobacion</option></select></details>
+                        <details><summary>Respuestas reutilizables</summary>
+                            <label for="respuestaRapida">Consultar respuesta</label><select id="respuestaRapida"><option value="">Seleccionar...</option><?php foreach (respuestas_listar($pdo) as $respuesta): ?><option value="<?= ui_e($respuesta['contenido']) ?>"><?= ui_e($respuesta['titulo']) ?></option><?php endforeach; ?></select>
+                            <p id="vistaRespuestaRapida" class="reusable-preview" role="status">Selecciona una respuesta para leerla antes de insertarla.</p>
+                            <div class="page-tools"><button type="button" id="insertarRespuestaRapida" class="card-button secondary-button" disabled>Anadir al borrador</button><a href="respuestas.php" target="_blank" rel="noopener">Ver biblioteca<?= auth_es('admin') ? ' y editar' : '' ?></a></div>
+                        </details>
+                        <script src="respuestas.js?v=<?= filemtime(__DIR__ . '/respuestas.js') ?>" defer></script>
                         <div class="composer-row">
                             <label class="reply-action-label" for="accionRespuesta">Al enviar</label>
                             <select name="accion_respuesta" id="accionRespuesta" aria-describedby="respuestaAyuda">
                                 <option value="responder" <?= $borrador['accion'] === 'responder' ? 'selected' : '' ?>>Responder al cliente</option>
+                                <?php if (soporte_espera_disponible($pdo)): ?><option value="esperar" <?= $borrador['accion'] === 'esperar' ? 'selected' : '' ?>>Pedir informacion y esperar</option><?php endif; ?>
                                 <option value="resolver" <?= $borrador['accion'] === 'resolver' ? 'selected' : '' ?>>Proponer solucion</option>
                                 <option value="nota" <?= $borrador['accion'] === 'nota' ? 'selected' : '' ?>>Guardar nota interna</option>
                             </select>
@@ -741,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('enviarRespuesta').textContent = accion === 'nota' ? 'Guardar nota' : (accion === 'resolver' ? 'Enviar solucion' : 'Enviar respuesta');
         document.getElementById('respuestaAyuda').textContent = accion === 'nota'
             ? 'Solo visible para el equipo. No se enviara al cliente.'
-            : (accion === 'resolver' ? 'Se guardara como mensaje visible para el cliente y quedara pendiente de su confirmacion.' : 'Visible para el cliente. La incidencia seguira abierta.');
+            : (accion === 'esperar' ? 'Se enviara al cliente y quedara en espera hasta que responda. El SLA sigue contando.' : (accion === 'resolver' ? 'Se guardara como mensaje visible para el cliente y quedara pendiente de su confirmacion.' : 'Visible para el cliente. La incidencia quedara en trabajo.'));
         document.getElementById('opcionesResolucion').hidden = accion !== 'resolver';
         document.getElementById('formRespuesta').classList.toggle('is-internal', accion === 'nota');
     });

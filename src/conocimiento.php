@@ -57,6 +57,7 @@ function conocimiento_buscar(PDO $pdo, string $consulta, bool $esCliente, int $l
 }
 
 function portal_siguiente_accion(string $estado, ?string $ultimoAutor): array {
+    if ($estado === 'esperando_cliente') return ['titulo'=>'Necesitamos tu informacion', 'detalle'=>'Revisa la peticion del equipo y responde en esta conversacion para que podamos continuar.', 'tono'=>'attention'];
     if ($estado === 'cerrada') return ['titulo' => 'Solicitud finalizada', 'detalle' => 'Puedes consultar la solucion y la conversacion en el historial.', 'tono' => 'neutral'];
     if ($estado === 'resuelta') return ['titulo' => 'Confirma la solucion', 'detalle' => 'El equipo ha propuesto una solucion. Dinos si ya funciona.', 'tono' => 'success'];
     if ($ultimoAutor === 'tecnico') return ['titulo' => 'Tienes una respuesta', 'detalle' => 'Revisa el mensaje del equipo y responde si necesita mas informacion.', 'tono' => 'attention'];

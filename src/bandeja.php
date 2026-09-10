@@ -86,10 +86,56 @@ function bandeja_append_cola(string &$sql, string $cola): void {
     if ($cola === 'accion') {
         $sql .= " AND estado IN ('abierta','en_curso') AND COALESCE(ultimo_autor, 'cliente') = 'cliente'";
     } elseif ($cola === 'espera') {
-        $sql .= " AND estado IN ('abierta','en_curso') AND ultimo_autor = 'tecnico'";
+        $sql .= " AND estado = 'esperando_cliente'";
     } elseif ($cola === 'sla') {
         $sql .= " AND estado <> 'cerrada' AND sla_estado IN ('riesgo','vencido')";
     }
+}
+
+/** Las colas son alternativas: no heredan estado, responsable ni paginacion. */
+function bandeja_colas(): array {
+    return [
+        'todas' => ['label' => 'Todo el equipo', 'filtros' => []],
+        'accion' => ['label' => 'Necesita respuesta', 'filtros' => ['cola' => 'accion']],
+        'espera' => ['label' => 'Esperando al cliente', 'filtros' => ['cola' => 'espera']],
+        'sin_asignar' => ['label' => 'Sin asignar', 'filtros' => ['filtro_asignado' => 'sin_asignar']],
+        'sla' => ['label' => 'En riesgo', 'filtros' => ['cola' => 'sla']],
+        'confirmar' => ['label' => 'Por confirmar', 'filtros' => ['filtro_estado' => 'resuelta']],
+    ];
+}
+
+function bandeja_url_cola(string $cola, array $contexto): string {
+    $conservar = ['busqueda', 'filtro_tipo', 'filtro_urgencia', 'filtro_desde', 'filtro_hasta',
+        'vista', 'orden', 'limite', 'orden_columna', 'direccion'];
+    $query = array_filter(array_intersect_key($contexto, array_flip($conservar)),
+        static fn($valor): bool => is_scalar($valor) && (string)$valor !== '');
+    $query = array_merge($query, bandeja_colas()[$cola]['filtros'] ?? []);
+    return 'index.php' . ($query ? '?' . http_build_query($query) : '');
+}
+
+/** Totales del mismo contexto de busqueda, antes de elegir cola o responsable. */
+function bandeja_contar_colas(PDO $pdo, string $fuente, array $filtros): array {
+    $sql = "SELECT
+        COALESCE(SUM(estado IN ('abierta','en_curso','esperando_cliente')),0) AS todas,
+        COALESCE(SUM(estado = 'esperando_cliente'),0) AS espera,
+        COALESCE(SUM(estado IN ('abierta','en_curso') AND COALESCE(ultimo_autor,'cliente') = 'cliente'),0) AS accion,
+        COALESCE(SUM(estado IN ('abierta','en_curso','esperando_cliente') AND asignado_id IS NULL),0) AS sin_asignar,
+        COALESCE(SUM(estado = 'resuelta'),0) AS confirmar
+        FROM $fuente WHERE estado <> 'cerrada'";
+    $params = [];
+    dominio_append_filtros($sql, $params, array_intersect_key($filtros,
+        array_flip(['busqueda', 'tipo', 'urgencia', 'desde', 'hasta'])));
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $totales = array_map('intval', $stmt->fetch(PDO::FETCH_ASSOC));
+    // Filtrar activas antes de evaluar SLA evita calcular calendarios del historico.
+    $sql = "SELECT COUNT(*) FROM $fuente WHERE estado IN ('abierta','en_curso','esperando_cliente') AND sla_estado IN ('riesgo','vencido')";
+    $params = [];
+    dominio_append_filtros($sql, $params, array_intersect_key($filtros,
+        array_flip(['busqueda', 'tipo', 'urgencia', 'desde', 'hasta'])));
+    $stmt = $pdo->prepare($sql); $stmt->execute($params);
+    $totales['sla'] = (int)$stmt->fetchColumn();
+    return $totales;
 }
 
 /** Lista cerrada de expresiones. Nunca interpola identificadores del usuario. */
@@ -98,8 +144,8 @@ function bandeja_orden_sql(string $columna, string $direccion, string $orden = '
         'prioridad' => 'prioridad_operativa',
         'incidencia' => 'id',
         'cliente' => "COALESCE(cliente_nombre, '')",
-        'estado' => "FIELD(estado, 'abierta','en_curso','resuelta','cerrada')",
-        'turno' => "CASE WHEN estado = 'cerrada' THEN 2 WHEN estado = 'resuelta' OR ultimo_autor = 'tecnico' THEN 1 ELSE 0 END",
+        'estado' => "FIELD(estado, 'abierta','en_curso','esperando_cliente','resuelta','cerrada')",
+        'turno' => "CASE WHEN estado = 'cerrada' THEN 2 WHEN estado IN ('resuelta','esperando_cliente') THEN 1 ELSE 0 END",
         'sla' => 'sla_restante',
         'responsable' => "COALESCE(asignado_nombre, '')",
         'actividad' => 'ultima_actividad',
